@@ -1,0 +1,26 @@
+# Fichiers sensibles
+config/config.php   # Contient les identifiants de base de données (à versionner avec des valeurs factices ou à exclure)
+
+# Dépendances (si tu utilises Composer plus tard)
+/vendor/
+
+# Fichiers de configuration locaux
+*.local.php
+.env
+
+# Uploads (images, pièces jointes)
+/assets/uploads/*
+!/assets/uploads/pic/bbl.jpeg
+!/assets/uploads/pic/icon.png
+!/assets/uploads/pic/a1.jpg
+
+# Fichiers temporaires et logs
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Fichiers de l'IDE
+.vscode/
+.idea/
