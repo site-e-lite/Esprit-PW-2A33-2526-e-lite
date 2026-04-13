@@ -205,12 +205,10 @@
         <a href="#" class="logo">e-lite<span>.</span><div style="font-size:0.8rem; letter-spacing:3px; color:var(--light-gray); font-family:var(--font-main);text-transform:uppercase;">BackOffice</div></a>
         
         <ul class="admin-nav">
-            <li><a href="#" class="active"><i class="fas fa-home"></i> Vue d'ensemble</a></li>
-            <li><a href="#"><i class="fas fa-users"></i> Gest. Utilisateurs</a></li>
-            <li><a href="#"><i class="fas fa-book-open"></i> Gest. Cours & Inscr.</a></li>
-            <li><a href="#"><i class="fas fa-tasks"></i> Gest. Évaluations</a></li>
-            <li><a href="forum.php"><i class="fas fa-comments"></i> Gest. Forum</a></li>
-            <li><a href="#"><i class="fas fa-video"></i> Classes Virtuelles</a></li>
+            <li><a href="quizzes_list.php"><i class="fas fa-list"></i> Liste des Quiz</a></li>
+            <li><a href="quiz_add.php"><i class="fas fa-plus-circle"></i> Ajouter un Quiz</a></li>
+            <li><a href="questions_list.php"><i class="fas fa-question-circle"></i> Liste des Questions</a></li>
+            <li><a href="question_add.php"><i class="fas fa-plus-square"></i> Ajouter une Question</a></li>
             
             <li><a href="../FrontOffice/index.html" style="margin-top:2rem; border: 1px dashed var(--glass-border);"><i class="fas fa-external-link-alt"></i> Voir le Site</a></li>
             <li><a href="#" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</a></li>
@@ -321,17 +319,7 @@
                 <p style="color:var(--light-gray); font-size:0.9rem; margin-bottom: 1.5rem;">Interventions de l'IA sur la plateforme aujourd'hui.</p>
                 
                 <div style="display:flex; flex-direction:column; gap:1.2rem;">
-                    <div style="display:flex; gap:1rem; align-items:flex-start; padding-bottom: 1rem; border-bottom: 1px solid var(--glass-border);">
-                        <div style="background: rgba(234,179,8,0.1); width: 40px; height: 40px; border-radius: 50%; display:grid; place-items:center; color: var(--accent);">
-                            <i class="fas fa-reply"></i>
-                        </div>
-                        <div>
-                            <strong style="display:block; font-size:0.95rem;">Suggestion Réponse Forum</strong>
-                            <span style="font-size:0.8rem; color:var(--light-gray);">Dans "Bug Vercel 404" (G. Forum)</span>
-                        </div>
-                        <span style="margin-left:auto; font-size:0.8rem; color:var(--accent);">Il y a 5 min</span>
-                    </div>
-
+        
                     <div style="display:flex; gap:1rem; align-items:flex-start; padding-bottom: 1rem; border-bottom: 1px solid var(--glass-border);">
                         <div style="background: rgba(16,185,129,0.1); width: 40px; height: 40px; border-radius: 50%; display:grid; place-items:center; color: var(--green-eco);">
                             <i class="fas fa-magic"></i>

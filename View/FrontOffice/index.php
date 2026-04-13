@@ -1,34 +1,10 @@
 <?php
-require_once __DIR__ . '/../../Controller/ForumController.php';
-require_once __DIR__ . '/../../Controller/PostController.php';
-
-$forumController = new ForumController();
-$postController = new PostController();
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_POST['action']) && $_POST['action'] == 'add_forum') {
-        $forum = new Forum($_POST['titre'], $_POST['description'], $_POST['idCourse']);
-        $forumController->addForum($forum);
-        header('Location: index.php#forum');
-        exit;
-    }
-    if (isset($_POST['action']) && $_POST['action'] == 'add_post') {
-        $idF = isset($_POST['idForum']) ? $_POST['idForum'] : 1;
-        $post = new Post($_POST['contenu'], 8, $idF, ''); // Default fake User #8
-        $postController->addPost($post);
-        header('Location: index.php#forum');
-        exit;
-    }
-}
-
-$db = Config::getConnexion();
-$stmtForums = $db->query("SELECT * FROM forum ORDER BY dateCreation DESC LIMIT 10");
-$frontForums = $stmtForums->fetchAll(PDO::FETCH_ASSOC);
-
-function getForumPosts($db, $idForum) {
-    $stmt = $db->prepare("SELECT * FROM post WHERE idForum = :idForum ORDER BY datePost ASC");
-    $stmt->execute(['idForum' => $idForum]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+require_once __DIR__ . '/../../Controller/QuizController.php';
+$quizController = new QuizController();
+$quizResult = $quizController->afficherQuizsActifs();
+$quizList = [];
+if ($quizResult) {
+    $quizList = $quizResult->fetchAll();
 }
 ?>
 <!DOCTYPE html>
@@ -141,53 +117,6 @@ function getForumPosts($db, $idForum) {
         </div>
     </div>
 
-    <!-- 3. GESTION EVALUATION MODALS -->
-    <div class="modal" id="modalAddQuiz">
-        <div class="modal-header">
-            <h3><i class="fas fa-tasks"></i> Ajouter un Quiz</h3>
-            <button class="close-btn" onclick="closeModal('modalAddQuiz')">&times;</button>
-        </div>
-        <div class="modal-body">
-            <form class="glass-form">
-                <div class="form-group"><label>Titre du Quiz</label><input type="text"></div>
-                <div class="form-group"><label>Seuil de Réussite (%)</label><input type="number" min="0" max="100"></div>
-                <button type="button" class="btn-primary w-100" onclick="closeModal('modalAddQuiz')">Enregistrer le Quiz</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- 4. GESTION FORUM MODALS -->
-    <div class="modal" id="modalAddForum">
-        <div class="modal-header">
-            <h3><i class="fas fa-comments"></i> Créer un Forum</h3>
-            <button class="close-btn" onclick="closeModal('modalAddForum')">&times;</button>
-        </div>
-        <div class="modal-body">
-            <form action="index.php" method="POST" class="glass-form form-grid" onsubmit="return validateForum(this)">
-                <input type="hidden" name="action" value="add_forum">
-                <div class="form-group full-width"><label>Titre</label><input type="text" name="titre" placeholder="Minimum 3 caractères"></div>
-                <div class="form-group full-width"><label>Description</label><textarea name="description" placeholder="Minimum 10 caractères"></textarea></div>
-                <div class="form-group"><label>ID Cours Associé</label><input type="number" name="idCourse" value="0"></div>
-                <button type="submit" class="btn-primary full-width mt-3">Créer le forum</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="modal" id="modalAddPost">
-        <div class="modal-header">
-            <h3><i class="fas fa-reply"></i> Ajouter un Post</h3>
-            <button class="close-btn" onclick="closeModal('modalAddPost')">&times;</button>
-        </div>
-        <div class="modal-body">
-            <form action="index.php" method="POST" class="glass-form" onsubmit="return validatePost(this)">
-                <input type="hidden" name="action" value="add_post">
-                <input type="hidden" name="idForum" id="reply_forum_id">
-                <div class="form-group"><label>Votre Réponse</label><textarea name="contenu" style="min-height: 120px;" placeholder="Tapez 5 caractères minimum..."></textarea></div>
-                <button type="submit" class="btn-primary w-100 mt-3"><i class="fas fa-paper-plane"></i> Publier la réponse</button>
-            </form>
-        </div>
-    </div>
-
     <!-- 5. GESTION CLASSES VIRTUELLES MODALS -->
     <!-- Modale générique pour limiter la taille, utilisées pour Forum et Session -->
     <div class="modal" id="modalGeneric">
@@ -213,7 +142,7 @@ function getForumPosts($db, $idForum) {
                 <li><a href="#accueil">Accueil</a></li>
                 <li><a href="#cours">Cours & IA</a></li>
                 <li><a href="#evaluations">Évaluations</a></li>
-                <li><a href="#forum">Communauté</a></li>
+                <li><a href="#forum">Forum</a></li>
                 <li><a href="#classes">Classes Virtuelles</a></li>
             </ul>
             <div class="auth-buttons">
@@ -309,149 +238,47 @@ function getForumPosts($db, $idForum) {
         <div class="section-header">
             <h2>Évaluations & <span class="text-gradient">Quiz Adaptatifs</span></h2>
             <p>Calcul automatique des scores et adaptation du niveau via IA simple.</p>
-            <button class="btn-outline mt-3" onclick="openModal('modalAddQuiz')"><i class="fas fa-plus"></i> Editer Quiz (Admin)</button>
         </div>
 
         <div class="quiz-container glass-card">
-            <div class="quiz-header">
-                <h3>Quiz : Algorithmique (Adaptatif)</h3>
-                <span class="status pulse">En cours...</span>
-            </div>
-            <div class="question-box">
-                <span class="question-type">Question Choix Multiple</span>
-                <h4>Quelle structure de donnée utilise le principe LIFO ?</h4>
-                <div class="options">
-                    <button class="quiz-option">A. File (Queue)</button>
-                    <button class="quiz-option">B. Pile (Stack)</button>
-                    <button class="quiz-option">C. Arbre binaire</button>
+            <?php if (!empty($quizList)): ?>
+                <?php foreach ($quizList as $index => $quiz): ?>
+                    <div class="quiz-header">
+                        <h3><?= htmlspecialchars($quiz['titre']) ?></h3>
+                        <span class="status pulse"><?= htmlspecialchars($quiz['statut']) ?></span>
+                    </div>
+                    <div class="question-box">
+                        <div class="quiz-meta" style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1rem; color:rgba(255,255,255,0.7);">
+                            <span><i class="fas fa-clock"></i> <?= htmlspecialchars($quiz['duree']) ?> min</span>
+                            <span><i class="fas fa-percent"></i> Seuil <?= htmlspecialchars($quiz['seuilReussite']) ?>%</span>
+                            <span><i class="fas fa-layer-group"></i> Niveau <?= htmlspecialchars($quiz['niveau']) ?></span>
+                        </div>
+                        <a class="btn-primary" href="quiz.php?id=<?= htmlspecialchars($quiz['idQuiz']) ?>">Accéder à l’évaluation</a>
+                    </div>
+                    <?php if ($index !== count($quizList) - 1): ?>
+                        <hr style="border-color:rgba(255,255,255,0.08); margin:2rem 0;">
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div style="color:rgba(255,255,255,0.6);">
+                    <p>Aucun quiz trouvé pour le moment. Ajoutez-en depuis le back office pour qu’ils s’affichent ici.</p>
                 </div>
-                <div class="ai-feedback mt-3" style="display:none;" id="quizFeedback">
-                    <i class="fas fa-robot"></i> <strong>Explication IA :</strong> La bonne réponse est B. Le niveau de la prochaine question va augmenter.
-                </div>
-            </div>
+            <?php endif; ?>
         </div>
     </section>
 
-    <!-- GESTION FORUM ET COMMU -->
+    <!-- GESTION FORUM -->
     <section id="forum" class="gestion-section reveal">
         <div class="section-header">
             <h2>Forum & <span class="text-gradient">Discussions</span></h2>
-            <p>Tri intelligent et suggestions de réponses IA pour booster l'entraide.</p>
-            <button class="btn-outline mt-3" onclick="openModal('modalAddForum')"><i class="fas fa-plus"></i> Créer Forum</button>
+            <p>Échangez avec la communauté et consultez les sujets importants.</p>
+            <button class="btn-outline mt-3" onclick="openGenericModal('Forum', 'Accédez à l’espace forum pour échanger sur les cours et les quiz.');"><i class="fas fa-comments"></i> Ouvrir le Forum</button>
         </div>
 
-        <div class="pro-forum-container glass-card" style="padding: 0; overflow: hidden;">
-            <!-- Header du Tableau Pro -->
-            <div class="forum-header" style="display: grid; grid-template-columns: 3fr 1fr 1fr; padding: 1rem 2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--glass-border); font-weight: 600; color: var(--light-gray); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;">
-                <div>Forum / Catégorie</div>
-                <div style="text-align: center;">Statistiques</div>
-                <div style="text-align: right;">Activité Récente</div>
-            </div>
-            
-            <div class="forum-body">
-            <?php if (!empty($frontForums)): ?>
-                <?php foreach ($frontForums as $f): 
-                    $posts = getForumPosts($db, $f['idForum']);
-                    $postCount = count($posts);
-                    // Obtenir le dernier post s'il y en a
-                    $lastPost = $postCount > 0 ? end($posts) : null;
-                ?>
-                <!-- Ligne Principale du Forum (Cliquable) -->
-                <div class="forum-row" style="display: grid; grid-template-columns: 3fr 1fr 1fr; padding: 1.5rem 2rem; border-bottom: 1px solid var(--glass-border); align-items: center; cursor: pointer; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.02)';" onmouseout="this.style.background='transparent';" onclick="toggleForumView(<?= $f['idForum'] ?>)">
-                    
-                    <div style="display: flex; gap: 1.5rem; align-items: center;">
-                        <div style="min-width: 50px; height: 50px; background: rgba(234,179,8,0.1); color: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                            <i class="fas fa-comments"></i>
-                        </div>
-                        <div>
-                            <h3 style="margin: 0 0 0.3rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;"><?= htmlspecialchars($f['titre']) ?></h3>
-                            <p style="margin: 0; font-size: 0.85rem; color: var(--light-gray); line-height: 1.4;"><?= htmlspecialchars($f['description']) ?></p>
-                        </div>
-                    </div>
-
-                    <div style="text-align: center; color: var(--light-gray); font-size: 0.85rem;">
-                        <strong style="color: var(--text-main); font-size: 1.2rem; display: block; margin-bottom: 0.2rem;"><?= $postCount ?></strong> Messages
-                    </div>
-
-                    <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;">
-                        <?php if($lastPost): ?>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="font-size: 0.8rem; color: var(--light-gray);">Par <strong style="color:var(--text-main);">#<?= $lastPost['idUser'] ?></strong></span>
-                                <img src="https://ui-avatars.com/api/?name=User+<?= $lastPost['idUser'] ?>&background=333&color=fff" style="width: 24px; height: 24px; border-radius: 50%;">
-                            </div>
-                            <span style="font-size: 0.75rem; color: var(--accent);"><i class="far fa-clock"></i> <?= $lastPost['datePost'] ?></span>
-                        <?php else: ?>
-                            <span style="font-size: 0.85rem; color: var(--light-gray); font-style: italic;">Aucun message</span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- VUE DES MESSAGES DU FORUM (Caché par défaut) -->
-                <div id="forum-thread-<?= $f['idForum'] ?>" style="display: none; background: rgba(0,0,0,0.3); padding: 2rem; border-bottom: 1px solid var(--glass-border); box-shadow: inset 0 5px 15px rgba(0,0,0,0.5);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                        <h4 style="margin: 0; color: var(--accent); font-size: 1.1rem;"><i class="fas fa-stream"></i> Fil de discussion : <?= htmlspecialchars($f['titre']) ?></h4>
-                        <button class="btn-primary" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;" onclick="openReplyModal(<?= $f['idForum'] ?>)"><i class="fas fa-reply"></i> Nouveau Message</button>
-                    </div>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 1rem;">
-                        <?php if($postCount > 0): ?>
-                            <?php foreach($posts as $p): ?>
-                                <?php $replyId = 'reply-' . $p['idPost']; $previewText = mb_substr($p['contenu'], 0, 80); ?>
-                                <div class="post-card" id="post-<?= $p['idPost'] ?>" style="display: flex; flex-direction: column; gap: 0; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); overflow: hidden;">
-                                    <!-- Main message row -->
-                                    <div style="display: flex; gap: 2rem; padding: 1.5rem;">
-                                        <!-- Auteur Block -->
-                                        <div style="text-align: center; min-width: 90px;">
-                                            <img src="https://ui-avatars.com/api/?name=User+<?= $p['idUser'] ?>&background=d4af37&color=000" style="width: 55px; height: 55px; border-radius: 50%; margin-bottom: 0.5rem; border: 2px solid var(--accent);">
-                                            <strong style="display: block; font-size: 0.85rem; color: var(--text-main);">User #<?= htmlspecialchars($p['idUser']) ?></strong>
-                                            <span style="font-size: 0.7rem; color: var(--accent); background: rgba(234,179,8,0.1); padding: 0.15rem 0.4rem; border-radius: 12px; display: inline-block; margin-top: 0.2rem;">Membre</span>
-                                        </div>
-                                        
-                                        <!-- Contenu Block -->
-                                        <div style="flex: 1; display: flex; flex-direction: column;">
-                                            <div style="margin-bottom: 0.8rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.78rem; color: var(--light-gray); display: flex; justify-content: space-between; align-items: center;">
-                                                <span><i class="far fa-clock"></i> Posté le <?= htmlspecialchars($p['datePost']) ?></span>
-                                                <span style="font-size:0.75rem; color:var(--light-gray); opacity:0.6;">#<?= htmlspecialchars($p['idPost']) ?></span>
-                                            </div>
-                                            <p style="margin: 0 0 1rem 0; font-size: 0.95rem; line-height: 1.6; color: rgba(255,255,255,0.9); flex: 1;"><?= nl2br(htmlspecialchars($p['contenu'])) ?></p>
-                                            <!-- Reply trigger button -->
-                                            <div style="display: flex; justify-content: flex-end;">
-                                                <button onclick="toggleInlineReply('<?= $replyId ?>', '<?= htmlspecialchars(addslashes($previewText), ENT_QUOTES) ?>', <?= $p['idUser'] ?>)" style="background: rgba(234,179,8,0.08); color: var(--accent); border: 1px solid rgba(234,179,8,0.3); padding: 0.35rem 0.9rem; border-radius: 20px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(234,179,8,0.2)'" onmouseout="this.style.background='rgba(234,179,8,0.08)'">
-                                                    <i class="fas fa-reply"></i> Répondre
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Inline Reply Form (hidden by default) -->
-                                    <div id="<?= $replyId ?>" data-reply-box style="display: none; padding: 1.2rem 1.5rem 1.5rem 1.5rem; border-top: 1px solid rgba(234,179,8,0.15); background: rgba(234,179,8,0.03);">
-                                        <form action="index.php" method="POST" novalidate onsubmit="return validatePost(this)">
-                                            <input type="hidden" name="action" value="add_post">
-                                            <input type="hidden" name="idForum" value="<?= $f['idForum'] ?>">
-                                            <div style="margin-bottom: 0.8rem;">
-                                                <div id="<?= $replyId ?>-quote" style="background: rgba(0,0,0,0.3); border-left: 3px solid var(--accent); padding: 0.6rem 1rem; border-radius: 4px; font-size: 0.8rem; color: var(--light-gray); margin-bottom: 0.7rem; font-style: italic;"></div>
-                                                <textarea name="contenu" id="<?= $replyId ?>-textarea" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(234,179,8,0.2); color: var(--text-main); padding: 0.8rem; border-radius: 6px; resize: vertical; min-height: 80px; font-family: inherit; font-size: 0.9rem;" placeholder="Tapez votre réponse (min. 5 caractères)..."></textarea>
-                                            </div>
-                                            <div style="display: flex; justify-content: flex-end; gap: 0.7rem;">
-                                                <button type="button" onclick="toggleInlineReply('<?= $replyId ?>')" style="background: transparent; color: var(--light-gray); border: 1px solid rgba(255,255,255,0.1); padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Annuler</button>
-                                                <button type="submit" style="background: var(--accent); color: #000; border: none; padding: 0.4rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem;"><i class="fas fa-paper-plane"></i> Envoyer</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div style="text-align: center; padding: 2rem; color: var(--light-gray);">
-                                <i class="far fa-frown" style="font-size: 2.5rem; opacity: 0.5; margin-bottom: 1rem;"></i>
-                                <p style="font-size: 0.95rem;">Aucune discussion n'a été trouvée dans cette catégorie.<br>Soyez le premier à poser une question !</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div style="padding: 3rem; text-align: center; color: var(--light-gray);">Aucun forum n'est disponible pour le moment.</div>
-            <?php endif; ?>
+        <div class="forum-card glass-card">
+            <div class="forum-summary">
+                <p>Le forum est disponible comme espace de discussion. Cette version est une interface de démonstration.</p>
+                <p style="color:rgba(255,255,255,0.65); font-size:0.9rem; margin-top:1rem;">Pour gérer les messages, utilisez le BackOffice.</p>
             </div>
         </div>
     </section>
@@ -512,29 +339,6 @@ function getForumPosts($db, $idForum) {
 
     <script src="../assets/index.js"></script>
     <script>
-        function openReplyModal(idForum) {
-            document.getElementById('reply_forum_id').value = idForum;
-            if (typeof openModal === 'function') {
-                openModal('modalAddPost');
-            }
-        }
-
-        function toggleForumView(idForum) {
-            const threadDiv = document.getElementById('forum-thread-' + idForum);
-            if (threadDiv.style.display === 'none' || threadDiv.style.display === '') {
-                // Smooth slide open
-                threadDiv.style.display = 'block';
-                threadDiv.style.opacity = '0';
-                threadDiv.style.transform = 'translateY(-8px)';
-                setTimeout(() => {
-                    threadDiv.style.transition = 'opacity 0.3s, transform 0.3s';
-                    threadDiv.style.opacity = '1';
-                    threadDiv.style.transform = 'translateY(0)';
-                }, 10);
-            } else {
-                threadDiv.style.display = 'none';
-            }
-        }
 
         function toggleInlineReply(replyId, quotedText, authorId) {
             const box = document.getElementById(replyId);

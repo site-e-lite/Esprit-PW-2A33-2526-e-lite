@@ -185,3 +185,149 @@ function showValidationError(form, message) {
     // Auto-remove after 4s
     setTimeout(() => banner.remove(), 4000);
 }
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.className = 'toast' + (type === 'error' ? ' error' : '');
+    toast.querySelector('span').textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// ══════════════════════════════════════════
+//  Form Validation — Quiz
+// ══════════════════════════════════════════
+function setValidationField(fieldId, valid, message) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+    const group = field.closest('.field-group');
+    if (!group) return;
+    group.classList.remove('field-error', 'field-success');
+    if (valid === false) {
+        group.classList.add('field-error');
+    } else if (valid === true) {
+        group.classList.add('field-success');
+    }
+    const msg = group.querySelector('.field-msg');
+    if (msg) msg.textContent = message || '';
+}
+
+function validateQuizForm(form) {
+    const titre = (form.titre ? form.titre.value.trim() : '');
+    const duree = parseInt(form.duree ? form.duree.value : '0', 10);
+    const seuil = parseInt(form.seuilReussite ? form.seuilReussite.value : '0', 10);
+    const niveau = (form.niveau ? form.niveau.value.trim() : '');
+    const statut = (form.statut ? form.statut.value.trim() : '');
+
+    let valid = true;
+
+    if (titre === '') {
+        setValidationField('titre', false, 'Le titre est obligatoire.');
+        valid = false;
+    } else if (titre.length < 3) {
+        setValidationField('titre', false, 'Le titre doit contenir au moins 3 caractères.');
+        valid = false;
+    } else {
+        setValidationField('titre', true, 'Titre valide.');
+    }
+
+    if (!Number.isInteger(duree) || duree <= 0) {
+        setValidationField('duree', false, 'La durée doit être supérieure à 0.');
+        valid = false;
+    } else {
+        setValidationField('duree', true, 'Durée valide.');
+    }
+
+    if (!Number.isInteger(seuil) || seuil < 0 || seuil > 100) {
+        setValidationField('seuilReussite', false, 'Le seuil doit être entre 0 et 100.');
+        valid = false;
+    } else {
+        setValidationField('seuilReussite', true, 'Seuil valide.');
+    }
+
+    if (niveau === '') {
+        setValidationField('niveau', false, 'Le niveau est obligatoire.');
+        valid = false;
+    } else {
+        setValidationField('niveau', true, 'Niveau valide.');
+    }
+
+    if (statut === '') {
+        setValidationField('statut', false, 'Le statut est obligatoire.');
+        valid = false;
+    } else {
+        setValidationField('statut', true, 'Statut valide.');
+    }
+
+    if (!valid) {
+        showValidationError(form, 'Merci de corriger les champs en rouge.');
+    }
+    return valid;
+}
+
+// ══════════════════════════════════════════
+//  Form Validation — Question
+// ══════════════════════════════════════════
+function validateQuestionForm(form) {
+    const enonce = (form.enonce ? form.enonce.value.trim() : '');
+    const type = (form.type ? form.type.value.trim() : '');
+    const choixA = (form.choixA ? form.choixA.value.trim() : '');
+    const choixB = (form.choixB ? form.choixB.value.trim() : '');
+    const choixC = (form.choixC ? form.choixC.value.trim() : '');
+    const choixD = (form.choixD ? form.choixD.value.trim() : '');
+    const bonneReponse = (form.bonneReponse ? form.bonneReponse.value.trim() : '');
+    const note = parseFloat(form.note ? form.note.value : '0');
+    const idQuiz = parseInt(form.idQuiz ? form.idQuiz.value : '0', 10);
+
+    let valid = true;
+
+    if (enonce === '') {
+        setValidationField('enonce', false, 'L’énoncé est obligatoire.');
+        valid = false;
+    } else {
+        setValidationField('enonce', true, 'Énoncé valide.');
+    }
+
+    if (type === '') {
+        setValidationField('type', false, 'Le type de question est obligatoire.');
+        valid = false;
+    } else {
+        setValidationField('type', true, 'Type valide.');
+    }
+
+    if (bonneReponse === '') {
+        setValidationField('bonneReponse', false, 'La bonne réponse est obligatoire.');
+        valid = false;
+    } else {
+        setValidationField('bonneReponse', true, 'Bonne réponse valide.');
+    }
+
+    if (!(note > 0)) {
+        setValidationField('note', false, 'La note doit être supérieure à 0.');
+        valid = false;
+    } else {
+        setValidationField('note', true, 'Note valide.');
+    }
+
+    if (!Number.isInteger(idQuiz) || idQuiz <= 0) {
+        setValidationField('idQuiz', false, 'L’ID du quiz doit être un nombre valide.');
+        valid = false;
+    } else {
+        setValidationField('idQuiz', true, 'ID Quiz valide.');
+    }
+
+    if (type === 'QCM') {
+        const choixRemplis = [choixA, choixB, choixC, choixD].filter(c => c !== '').length;
+        if (choixRemplis < 2) {
+            setValidationField('choixA', false, 'Au moins deux choix doivent être remplis pour un QCM.');
+            setValidationField('choixB', false, 'Au moins deux choix doivent être remplis pour un QCM.');
+            valid = false;
+        }
+    }
+
+    if (!valid) {
+        showValidationError(form, 'Merci de corriger les champs en rouge.');
+    }
+    return valid;
+}

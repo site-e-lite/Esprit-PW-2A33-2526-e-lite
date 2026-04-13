@@ -261,9 +261,10 @@ if ($postData) {
             <div style="font-size:0.8rem; letter-spacing:3px; color:rgba(255,255,255,0.4); font-family:inherit; text-transform:uppercase; font-weight:400;">BackOffice</div>
         </a>
         <ul class="admin-nav">
-            <li><a href="dashboard.php"><i class="fas fa-home"></i> Vue d'ensemble</a></li>
-            <li><a href="forums_list.php"><i class="fas fa-list"></i> Liste Forums</a></li>
-            <li><a href="posts_list.php" class="active"><i class="fas fa-comments"></i> Liste Posts</a></li>
+            <li><a href="quizzes_list.php"><i class="fas fa-tasks"></i> Liste des Quiz</a></li>
+            <li><a href="quiz_add.php"><i class="fas fa-plus-circle"></i> Ajouter un Quiz</a></li>
+            <li><a href="questions_list.php"><i class="fas fa-question-circle"></i> Liste des Questions</a></li>
+            <li><a href="question_add.php"><i class="fas fa-plus-square"></i> Ajouter une Question</a></li>
         </ul>
     </aside>
 
