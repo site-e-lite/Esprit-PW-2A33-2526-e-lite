@@ -1,0 +1,42 @@
+<?php
+session_start();
+require_once __DIR__ . '/Controller/UserController.php';
+
+$request = $_SERVER['REQUEST_URI'];
+$request = strtok($request, '?');
+$request = rtrim($request, '/');
+
+$controller = new UserController();
+
+switch ($request) {
+    case '':
+    case '/':
+        include __DIR__ . '/View/layout/header.php';
+        echo '<div class="hero"><h1>Welcome to e-lite</h1><p><a href="/login" class="btn-primary">Login</a> <a href="/register" class="btn-outline">Register</a></p></div>';
+        include __DIR__ . '/View/layout/footer.php';
+        break;
+    case '/login':
+        $controller->login();
+        break;
+    case '/logout':
+        $controller->logout();
+        break;
+    case '/register':
+        $controller->register();
+        break;
+    case '/profile':
+        $controller->profile();
+        break;
+    case '/profile/delete':
+        $controller->deleteAccount();
+        break;
+    case '/admin/dashboard':
+        $controller->adminDashboard();
+        break;
+    case '/student/dashboard':
+        $controller->studentDashboard();
+        break;
+    default:
+        http_response_code(404);
+        echo "404 - Page not found: " . htmlspecialchars($request);
+}
