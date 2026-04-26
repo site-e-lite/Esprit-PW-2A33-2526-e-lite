@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../config.php";
 // /home/hadesdivine/Music/user/Model/Role.php
 // ============================
-<?php
+
 require_once __DIR__ . '/../config.php';
 
 class Role {
