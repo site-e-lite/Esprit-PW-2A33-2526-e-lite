@@ -19,6 +19,13 @@
     </div>
 </aside>
 <?php endif; ?>
+<?php if (!isset($_SESSION["user_id"])): ?>
+<div class="footer-language">
+    <div class="container" style="text-align: center; padding: 1rem 0;">
+        <i class="fas fa-language"></i> <span id="google_translate_footer"></span>
+    </div>
+</div>
+<?php endif; ?>
 <footer>
     <div class="footer-links">
         <a href="#">À propos</a>
@@ -28,5 +35,35 @@
     <p>© 2026 e-lite – Plateforme Éco-Digitale</p>
 </footer>
 <script src="/View/assets/user.js"></script>
+<script type="text/javascript">
+    new google.translate.TranslateElement({
+        pageLanguage: "fr",
+        includedLanguages: "en,fr,ar,es,de,it,zh-CN",
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+    }, "google_translate_element");
+}
+</script>
+<script type="text/javascript">
+function googleTranslateElementInit() {
+    var elem = document.getElementById("google_translate_element");
+    if (elem) {
+        new google.translate.TranslateElement({
+            pageLanguage: "fr",
+            includedLanguages: "en,fr,ar,es,de,it,zh-CN",
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+        }, "google_translate_element");
+    } else {
+        var footerElem = document.getElementById("google_translate_footer");
+        if (footerElem) {
+            new google.translate.TranslateElement({
+                pageLanguage: "fr",
+                includedLanguages: "en,fr,ar,es,de,it,zh-CN",
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, "google_translate_footer");
+        }
+    }
+}
+</script>
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
 </html>

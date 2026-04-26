@@ -29,6 +29,7 @@
             <?php endif; ?>
         </ul>
         <div class="auth-buttons">
+    <div id="google_translate_element" style="margin-left: 1rem;"></div>
             <?php if (isset($_SESSION['user_id'])): ?>
                 <a href="/logout" class="btn-outline"><i class="fas fa-sign-out-alt"></i> Déconnexion</a>
             <?php else: ?>

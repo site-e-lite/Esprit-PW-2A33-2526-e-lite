@@ -36,6 +36,12 @@ switch ($request) {
     case '/student/dashboard':
         $controller->studentDashboard();
         break;
+    case '/login/google':
+        $controller->googleLogin();
+        break;
+    case '/login/google-callback':
+        $controller->googleCallback();
+        break;
     default:
         http_response_code(404);
         echo "404 - Page not found: " . htmlspecialchars($request);

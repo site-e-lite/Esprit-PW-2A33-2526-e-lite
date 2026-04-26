@@ -487,3 +487,103 @@ body:has(.sidebar.open) main {
     color: var(--black);
     transform: translateY(-2px);
 }
+
+/* ===== Google button premium style ===== */
+.social-btn.google {
+    background: white;
+    color: #757575;
+    border: 1px solid #ddd;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.social-btn.google:hover {
+    background: #4285f4;
+    color: white;
+    border-color: #4285f4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(66,133,244,0.3);
+}
+.social-btn.google i {
+    color: #4285f4;
+    font-size: 1.2rem;
+}
+.social-btn.google:hover i {
+    color: white;
+}
+.social-btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 40px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+.social-divider {
+    text-align: center;
+    color: #a1a1aa;
+    font-size: 0.9rem;
+    margin: 1rem 0;
+    position: relative;
+}
+.social-divider span {
+    background: #131318;
+    padding: 0 1rem;
+}
+
+/* Google Translate widget styling */
+#google_translate_element {
+    display: inline-block;
+    vertical-align: middle;
+}
+.goog-te-gadget-simple {
+    background-color: #1e1e24 !important;
+    border: 1px solid #2a2a2f !important;
+    border-radius: 40px !important;
+    padding: 4px 8px !important;
+    font-family: inherit !important;
+}
+.goog-te-gadget-simple .goog-te-menu-value {
+    color: #eab308 !important;
+}
+.goog-te-gadget-simple .goog-te-menu-value span {
+    color: #eab308 !important;
+}
+.goog-te-gadget-simple .goog-te-menu-value span:nth-child(3) {
+    display: none;
+}
+.goog-te-gadget-simple .goog-te-menu-value span:nth-child(5) {
+    display: none;
+}
+.goog-te-gadget-icon {
+    display: none !important;
+}
+.goog-te-banner-frame.skiptranslate {
+    display: none !important;
+}
+body {
+    top: 0px !important;
+}
+
+/* Footer language selector for non‑logged‑in users */
+.footer-language {
+    background: var(--surface);
+    border-bottom: 1px solid var(--glass-border);
+    margin-bottom: 1rem;
+}
+.footer-language .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--light-gray);
+}
+.footer-language #google_translate_footer {
+    display: inline-block;
+}
+.footer-language .goog-te-gadget-simple {
+    background: #1e1e24 !important;
+    border-color: var(--glass-border) !important;
+}

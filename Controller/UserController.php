@@ -1,6 +1,10 @@
 <?php
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Model/User.php';
 require_once __DIR__ . '/../Model/Role.php';
+
+use Google\Client;
+use Google\Service\Oauth2;
 
 class UserController {
     private function isLoggedIn() {
@@ -31,7 +35,6 @@ class UserController {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email = filter_var(trim($_POST['email'] ?? ''), FILTER_SANITIZE_EMAIL);
             $password = $_POST['password'] ?? '';
-
             if (empty($email) || empty($password)) {
                 $error = "Email et mot de passe requis.";
             } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -43,6 +46,7 @@ class UserController {
                     $_SESSION['role_nom'] = $user['role_nom'];
                     $_SESSION['user_nom'] = $user['nom'];
                     $_SESSION['user_prenom'] = $user['prenom'];
+                    User::update($user['idUser'], ['last_login' => date('Y-m-d H:i:s')]);
                     if ($this->isStudent()) $this->redirect('/student/dashboard');
                     else $this->redirect('/admin/dashboard');
                 } else {
@@ -73,8 +77,6 @@ class UserController {
             $confirm = $_POST['confirm_password'] ?? '';
 
             $errors = [];
-
-            // Validation rules
             if (empty($nom)) $errors[] = "Le nom est requis.";
             elseif (strlen($nom) < 2) $errors[] = "Le nom doit contenir au moins 2 caractères.";
             if (empty($prenom)) $errors[] = "Le prénom est requis.";
@@ -85,7 +87,6 @@ class UserController {
             if ($password !== $confirm) $errors[] = "Les mots de passe ne correspondent pas.";
             if (User::findByEmail($email)) $errors[] = "Cet email est déjà utilisé.";
 
-            // Prevent registration with admin role (only via admin panel)
             $roleExists = false;
             foreach ($roles as $r) {
                 if ($r['idRole'] == $idRole && strtolower($r['nom']) !== 'admin') {
@@ -128,7 +129,6 @@ class UserController {
             $prenom = htmlspecialchars(trim($_POST['prenom'] ?? ''), ENT_QUOTES, 'UTF-8');
             $telephone = trim($_POST['telephone'] ?? '');
             $bio = trim($_POST['bio'] ?? '');
-
             $errors = [];
             if (empty($nom)) $errors[] = "Le nom est requis.";
             elseif (strlen($nom) < 2) $errors[] = "Le nom doit contenir au moins 2 caractères.";
@@ -140,7 +140,6 @@ class UserController {
             if (!empty($bio) && strlen($bio) > 500) {
                 $errors[] = "La bio ne peut pas dépasser 500 caractères.";
             }
-
             if (empty($errors)) {
                 User::update($_SESSION['user_id'], ['nom' => $nom, 'prenom' => $prenom, 'telephone' => $telephone, 'bio' => $bio]);
                 $_SESSION['user_nom'] = $nom;
@@ -207,5 +206,53 @@ class UserController {
         include __DIR__ . '/../View/layout/header.php';
         include __DIR__ . '/../View/student/dashboard.php';
         include __DIR__ . '/../View/layout/footer.php';
+    }
+
+    public function googleLogin() {
+        $client = new Client();
+        $client->setClientId(GOOGLE_CLIENT_ID);
+        $client->setClientSecret(GOOGLE_CLIENT_SECRET);
+        $client->setRedirectUri(GOOGLE_REDIRECT_URI);
+        $client->addScope('email');
+        $client->addScope('profile');
+        $authUrl = $client->createAuthUrl();
+        header('Location: ' . $authUrl);
+        exit;
+    }
+
+    public function googleCallback() {
+        $client = new Client();
+        $client->setClientId(GOOGLE_CLIENT_ID);
+        $client->setClientSecret(GOOGLE_CLIENT_SECRET);
+        $client->setRedirectUri(GOOGLE_REDIRECT_URI);
+        $token = $client->fetchAccessTokenWithAuthCode($_GET['code']);
+        $client->setAccessToken($token);
+        $oauth = new Oauth2($client);
+        $userInfo = $oauth->userinfo->get();
+        $email = $userInfo->email;
+        $user = User::findByEmail($email);
+        if (!$user) {
+            $pdo = Config::getConnexion();
+            $stmt = $pdo->prepare("SELECT idRole FROM role WHERE nom = 'etudiant'");
+            $stmt->execute();
+            $roleRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            $idRole = $roleRow ? $roleRow['idRole'] : 3;
+            $data = [
+                'nom' => $userInfo->familyName ?? '',
+                'prenom' => $userInfo->givenName ?? '',
+                'email' => $email,
+                'motDePasse' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT),
+                'idRole' => $idRole,
+                'statut' => 'actif'
+            ];
+            $userId = User::create($data);
+            $user = User::findById($userId);
+        }
+        $_SESSION['user_id'] = $user['idUser'];
+        $_SESSION['role_nom'] = $user['role_nom'];
+        $_SESSION['user_nom'] = $user['nom'];
+        $_SESSION['user_prenom'] = $user['prenom'];
+        User::update($user['idUser'], ['last_login' => date('Y-m-d H:i:s')]);
+        $this->redirect('/');
     }
 }

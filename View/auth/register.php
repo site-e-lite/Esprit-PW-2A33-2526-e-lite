@@ -21,5 +21,13 @@
         <div class="form-group"><label>Confirmer mot de passe</label><input type="password" name="confirm_password" required></div>
         <button type="submit" class="btn-primary" style="width:100%"><i class="fas fa-check"></i> S'inscrire</button>
     </form>
+    <div class="social-login">
+        <p class="social-divider"><span>Ou s'inscrire avec</span></p>
+        <div class="social-buttons">
+            <a href="/login/google" class="social-btn google"><i class="fab fa-google"></i> Google</a>
+            <button type="button" class="social-btn apple" onclick="alert('Apple bientôt disponible')"><i class="fab fa-apple"></i> Apple</button>
+            <button type="button" class="social-btn x" onclick="alert('X bientôt disponible')"><i class="fab fa-x-twitter"></i> X</button>
+        </div>
+    </div>
     <p style="margin-top:1.5rem; text-align:center">Déjà inscrit ? <a href="/login" class="btn-outline" style="display:inline-block; padding:0.5rem 1rem">Connectez-vous</a></p>
 </div>
