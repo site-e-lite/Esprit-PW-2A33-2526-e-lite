@@ -1,22 +1,19 @@
-FROM php:8.2-apache
+FROM php:8.2-cli
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy your code into the default Apache web root
-COPY . /var/www/html/
+# Set working directory
+WORKDIR /app
 
-# Enable mod_rewrite for .htaccess
-RUN a2enmod rewrite
+# Copy application code
+COPY . /app
 
-# Install PHP extensions (e.g., pdo_mysql if needed)
-RUN docker-php-ext-install pdo_mysql
+# Install dependencies if composer.json exists
+RUN if [ -f /app/composer.json ]; then composer install --no-interaction --optimize-autoloader; fi
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
+# Expose the port Render expects
+EXPOSE 10000
 
-# Install Composer dependencies (if composer.json exists)
-RUN if [ -f /var/www/html/composer.json ]; then \
-        cd /var/www/html && composer install --no-interaction --optimize-autoloader; \
-    fi
+# Start the PHP built-in server on Render's port
+CMD php -S 0.0.0.0:$PORT -t /app
