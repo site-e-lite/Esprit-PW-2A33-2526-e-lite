@@ -25,10 +25,10 @@ class PostController {
         try {
             $query = $db->prepare($sql);
             $query->execute([
-                'contenu' => $post->getContenu(),
-                'pieceJointe' => $post->getPieceJointe(),
-                'idUser' => $post->getIdUser(),
-                'idForum' => $post->getIdForum()
+                'contenu'     => $post->getContenu(),
+                'pieceJointe' => $post->getPieceJointe() ?: null,
+                'idUser'      => $post->getIdUser()  ?: null,
+                'idForum'     => $post->getIdForum() ?: null
             ]);
         } catch (Exception $e) {
             echo 'Erreur: ' . $e->getMessage();

@@ -8,7 +8,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $idForum     = intval($_POST['IdForum'] ?? $_POST['idForum'] ?? 0);
     $pieceJointe = trim($_POST['pieceJointe'] ?? '');
 
-    if (strlen($contenu) >= 5 && $idUser > 0 && $idForum > 0) {
+    if (strlen($contenu) >= 5 && !preg_match('/^\d+$/', $contenu) && $idUser > 0 && $idForum > 0) {
         $post = new Post($contenu, $idUser, $idForum, $pieceJointe ?: null);
         $postController->addPost($post);
         header('Location: posts_list.php?added=1');
@@ -208,6 +208,10 @@ function validateContenu(onBlur = false) {
     }
     if (t.length < 5) {
         setField('fg-contenu', 'error', `⚠ Minimum 5 caractères (actuellement ${t.length}).`);
+        validateContenu.isValid = false; return false;
+    }
+    if (/^\d+$/.test(t)) {
+        setField('fg-contenu', 'error', '⚠ Le contenu doit contenir du texte, pas seulement des chiffres.');
         validateContenu.isValid = false; return false;
     }
     setField('fg-contenu', 'success', '✓ Contenu valide.');

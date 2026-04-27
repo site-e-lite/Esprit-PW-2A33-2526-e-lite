@@ -15,7 +15,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $contenu    = $_POST['contenu']    ?? '';
     $pieceJointe = $_POST['pieceJointe'] ?? '';
 
-    if ($idPost && strlen(trim($contenu)) >= 5) {
+    if ($idPost && strlen(trim($contenu)) >= 5 && !preg_match('/^\d+$/', trim($contenu))) {
         $post = new Post($contenu, $idUser, $idForum, $pieceJointe);
         $postController->updatePost($post, $idPost);
         header('Location: posts_list.php?updated=1');
@@ -390,6 +390,10 @@ function validateContenu(onBlur = false) {
     }
     if (len > MAX_CONTENU) {
         setFieldState('fg-contenu', 'error', `⚠ Maximum ${MAX_CONTENU} caractères dépassé.`);
+        return false;
+    }
+    if (/^\d+$/.test(trimmed)) {
+        setFieldState('fg-contenu', 'error', '⚠ Le contenu doit contenir du texte, pas seulement des chiffres.');
         return false;
     }
 

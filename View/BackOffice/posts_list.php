@@ -179,17 +179,18 @@ $posts = $postController->afficherPosts($idForumFilter);
                 </thead>
                 <tbody>
                     <?php if ($posts && $posts->rowCount() > 0): ?>
-                        <?php while ($p = $posts->fetch()): ?>
+                        <?php while ($row = $posts->fetch()): ?>
+                        <?php $p = array_change_key_case($row, CASE_LOWER); ?>
                             <tr>
-                                <td><span style="color:#eab308; font-weight:700;">#<?= htmlspecialchars($p['idPost']) ?></span></td>
-                                <td><i class="fas fa-user" style="color:var(--accent); margin-right:0.4rem;"></i><?= htmlspecialchars($p['idUser']) ?></td>
-                                <td><span style="background:rgba(255,255,255,0.08); padding:0.3rem 0.7rem; border-radius:10px; font-size:0.8rem; white-space:nowrap;">Forum #<?= htmlspecialchars($p['idForum']) ?></span></td>
+                                <td><span style="color:#eab308; font-weight:700;">#<?= htmlspecialchars($p['idpost']) ?></span></td>
+                                <td><i class="fas fa-user" style="color:var(--accent); margin-right:0.4rem;"></i><?= htmlspecialchars($p['iduser']) ?></td>
+                                <td><span style="background:rgba(255,255,255,0.08); padding:0.3rem 0.7rem; border-radius:10px; font-size:0.8rem; white-space:nowrap;">Forum #<?= htmlspecialchars($p['idforum']) ?></span></td>
                                 <td style="max-width:220px; word-break:break-word; color:rgba(255,255,255,0.75);"><?= nl2br(htmlspecialchars(substr($p['contenu'], 0, 80))) ?>…</td>
-                                <td style="color:rgba(255,255,255,0.4); font-size:0.85rem;"><?= $p['pieceJointe'] ? htmlspecialchars($p['pieceJointe']) : '<span style="color:rgba(255,255,255,0.2);">—</span>' ?></td>
-                                <td style="color:rgba(255,255,255,0.4); font-size:0.82rem; white-space:nowrap;"><?= htmlspecialchars($p['datePost']) ?></td>
+                                <td style="color:rgba(255,255,255,0.4); font-size:0.85rem;"><?= $p['piecejointe'] ? htmlspecialchars($p['piecejointe']) : '<span style="color:rgba(255,255,255,0.2);">—</span>' ?></td>
+                                <td style="color:rgba(255,255,255,0.4); font-size:0.82rem; white-space:nowrap;"><?= htmlspecialchars($p['datepost']) ?></td>
                                 <td>
-                                    <a href="post_update.php?id=<?= $p['idPost'] ?>" class="action-btn" title="Éditer"><i class="fas fa-edit"></i></a>
-                                    <button class="action-btn delete" title="Supprimer" onclick="askDelete(<?= $p['idPost'] ?>)"><i class="fas fa-trash"></i></button>
+                                    <a href="post_update.php?id=<?= $p['idpost'] ?>" class="action-btn" title="Éditer"><i class="fas fa-edit"></i></a>
+                                    <button class="action-btn delete" title="Supprimer" onclick="askDelete(<?= $p['idpost'] ?>)"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
                         <?php endwhile; ?>

@@ -21,7 +21,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $titre       = trim($_POST['titre'] ?? '');
     $description = trim($_POST['description'] ?? '');
 
-    if ($idForum && strlen($titre) >= 3 && strlen($description) >= 10) {
+    // Description: accept text and numbers mixed, but reject numbers only
+    $descriptionValide = !preg_match('/^\d+$/', $description);
+
+    if ($idForum && strlen($titre) >= 3 && strlen($description) >= 10 && $descriptionValide) {
         $forum = new Forum($titre, $description, $idCourse);
         $forumController->updateForum($forum, $idForum);
         header('Location: forums_list.php?updated=1');
@@ -225,6 +228,16 @@ function setField(groupId, state, msg = '') {
     if (m) m.textContent = msg;
 }
 
+/* Block digits from being typed or pasted into the description */
+function blockDigits(el) {
+    const pos = el.selectionStart;
+    const cleaned = el.value.replace(/[0-9]/g, '');
+    if (cleaned !== el.value) {
+        el.value = cleaned;
+        el.setSelectionRange(Math.max(0, pos - 1), Math.max(0, pos - 1));
+    }
+}
+
 function checkDiff(fieldId, originalVal) {
     const el = document.getElementById(fieldId);
     if (!el) return;
@@ -279,6 +292,11 @@ function validateDescription(onBlur = false) {
     }
     if (trimmed.length < 10) {
         setField('fg-description', 'error', `⚠ Minimum 10 caractères (actuellement ${trimmed.length}).`);
+        return false;
+    }
+    // Reject only numbers, allow text with or without numbers
+    if (/^\d+$/.test(trimmed)) {
+        setField('fg-description', 'error', '⚠ La description doit contenir du texte, pas seulement des chiffres.');
         return false;
     }
     setField('fg-description', 'success', '✓ Description valide.');

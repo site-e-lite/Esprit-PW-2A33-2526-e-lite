@@ -55,9 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// ══════════════════════════════════════════
-//  Modal Management
-// ══════════════════════════════════════════
+
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     const overlay = document.getElementById('modalOverlay');
@@ -84,22 +82,28 @@ function openGenericModal(title, textContext) {
     openModal('modalGeneric');
 }
 
-// ══════════════════════════════════════════
+
 //  Form Validation — Forum (Add / Update)
-// ══════════════════════════════════════════
 function validateForum(form) {
     const titre       = (form.titre       ? form.titre.value.trim()       : '');
     const description = (form.description ? form.description.value.trim() : '');
     const idCourse    = (form.idCourse    ? form.idCourse.value.trim()    : '0');
 
-    if (titre.length < 3) {
-        showValidationError(form, "Le titre du forum doit contenir au moins 3 caractères.");
+    if (titre.length < 5) {
+        showValidationError(form, "Le titre du forum doit contenir au moins 5 caractères.");
         return false;
     }
     if (description.length < 10) {
         showValidationError(form, "La description doit contenir au moins 10 caractères.");
         return false;
     }
+
+    const lettersOnly = /^[a-zA-ZÀ-ÿ\s.,;:!'"?()\-–—]+$/;
+    if (!lettersOnly.test(description)) {
+        showValidationError(form, "La description ne doit contenir que des lettres (pas de chiffres).");
+        return false;
+    }
+
     if (idCourse !== '' && idCourse !== '0' && isNaN(idCourse)) {
         showValidationError(form, "L'ID du cours doit être un identifiant numérique valide.");
         return false;
@@ -107,9 +111,8 @@ function validateForum(form) {
     return true;
 }
 
-// ══════════════════════════════════════════
-//  Form Validation — Post (Add or Update)
-// ══════════════════════════════════════════
+
+//  Form Validation — Post 
 function validatePost(form) {
     const contenu = (form.contenu ? form.contenu.value.trim() : '');
 
@@ -142,9 +145,8 @@ function validatePost(form) {
     return true;
 }
 
-// ══════════════════════════════════════════
 //  Form Validation — Post Update (standalone)
-// ══════════════════════════════════════════
+
 function validatePostUpdate(form) {
     const contenu = (form.contenu ? form.contenu.value.trim() : '');
     if (contenu.length < 5) {
@@ -154,9 +156,19 @@ function validatePostUpdate(form) {
     return true;
 }
 
-// ══════════════════════════════════════════
+window.blockDigits = function(el) {
+    const pos = el.selectionStart;
+    const cleaned = el.value.replace(/[0-9]/g, '');
+    if (cleaned !== el.value) {
+        el.value = cleaned;
+        if(el.setSelectionRange) {
+            el.setSelectionRange(Math.max(0, pos - 1), Math.max(0, pos - 1));
+        }
+    }
+}
+
+
 //  Shared inline error display
-// ══════════════════════════════════════════
 function showValidationError(form, message) {
     // Remove any existing error banner
     const existing = form.querySelector('.js-validation-error');

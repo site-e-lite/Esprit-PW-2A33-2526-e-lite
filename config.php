@@ -8,7 +8,7 @@ class Config
         if (!isset(self::$pdo)) {
             try {
                 self::$pdo = new PDO(
-                    'mysql:host=localhost;dbname=forum',  // À adapter si besoin
+                    'mysql:host=localhost;dbname=e_lite',
                     'root',
                     '',
                     [

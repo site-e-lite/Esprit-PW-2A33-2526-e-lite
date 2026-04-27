@@ -114,16 +114,17 @@ $forums = $forumController->afficherForums();
                 </thead>
                 <tbody>
                     <?php if ($forums->rowCount() > 0): ?>
-                        <?php while ($f = $forums->fetch()): ?>
+                        <?php while ($row = $forums->fetch()): ?>
+                        <?php $f = array_change_key_case($row, CASE_LOWER); ?>
                             <tr>
-                                <td>#<?= htmlspecialchars($f['idForum']) ?></td>
+                                <td>#<?= htmlspecialchars($f['idforum']) ?></td>
                                 <td><strong><?= htmlspecialchars($f['titre']) ?></strong></td>
                                 <td><?= htmlspecialchars($f['description']) ?></td>
-                                <td><?= htmlspecialchars($f['dateCreation']) ?></td>
-                                <td><?= htmlspecialchars($f['idCourse']) ?></td>
+                                <td><?= htmlspecialchars($f['datecreation']) ?></td>
+                                <td><?= $f['idcourse'] ? htmlspecialchars($f['idcourse']) : '<span style="color:rgba(255,255,255,0.3);">—</span>' ?></td>
                                 <td>
-                                    <a href="forum_update.php?id=<?= $f['idForum'] ?>" class="action-btn" title="Éditer"><i class="fas fa-edit"></i></a>
-                                    <button class="action-btn delete" title="Supprimer" onclick="askDelete(<?= $f['idForum'] ?>)"><i class="fas fa-trash"></i></button>
+                                    <a href="forum_update.php?id=<?= $f['idforum'] ?>" class="action-btn" title="Éditer"><i class="fas fa-edit"></i></a>
+                                    <button class="action-btn delete" title="Supprimer" onclick="askDelete(<?= $f['idforum'] ?>)"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
                         <?php endwhile; ?>

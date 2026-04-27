@@ -7,7 +7,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $description = trim($_POST['description'] ?? '');
     $idCourse    = intval($_POST['IdCourse'] ?? 0);
 
-    if (strlen($titre) >= 3 && strlen($description) >= 10) {
+    // Description: accept text and numbers mixed, but reject numbers only
+    $descriptionValide = !preg_match('/^\d+$/', $description);
+
+    if (strlen($titre) >= 3 && strlen($description) >= 10 && $descriptionValide) {
         $forum = new Forum($titre, $description, $idCourse);
         $forumController->addForum($forum);
         header('Location: forums_list.php?added=1');
@@ -158,6 +161,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                           rows="5"
                           maxlength="1000"
                           placeholder="Décrivez le sujet de ce forum (min. 10 caractères)…"
+                          onkeydown="if(/[0-9]/.test(event.key)){event.preventDefault();}"
                           oninput="validateDescription()"
                           onblur="validateDescription(true)"></textarea>
                 <span class="char-counter" id="descCount">0 / 1000</span>
@@ -195,6 +199,17 @@ function setField(groupId, state, msg = '') {
     if (state) g.classList.add('field-' + state);
     const m = g.querySelector('.field-msg');
     if (m) m.textContent = msg;
+}
+
+/* Block digits from being typed or pasted into the description */
+function blockDigits(el) {
+    const pos = el.selectionStart;
+    const cleaned = el.value.replace(/[0-9]/g, '');
+    if (cleaned !== el.value) {
+        el.value = cleaned;
+        // restore cursor position
+        el.setSelectionRange(Math.max(0, pos - 1), Math.max(0, pos - 1));
+    }
 }
 
 function updateStep(stepNum, state) {
@@ -245,6 +260,12 @@ function validateDescription(onBlur = false) {
     }
     if (trimmed.length < 10) {
         setField('fg-description', 'error', `⚠ Minimum 10 caractères (actuellement ${trimmed.length}).`);
+        updateStep(2, 'active');
+        return false;
+    }
+    // Reject only numbers, allow text with or without numbers
+    if (/^\d+$/.test(trimmed)) {
+        setField('fg-description', 'error', '⚠ La description doit contenir du texte, pas seulement des chiffres.');
         updateStep(2, 'active');
         return false;
     }
