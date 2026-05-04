@@ -1,5 +1,7 @@
 {
     "require": {
-        "google/apiclient": "*"
+        "google/apiclient": "1.1.9",
+        "abraham/twitteroauth": "^8.1",
+        "phpmailer/phpmailer": "^7.0"
     }
 }
