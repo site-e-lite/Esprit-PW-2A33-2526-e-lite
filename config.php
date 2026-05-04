@@ -2,6 +2,8 @@
 class Config
 {
     private static $pdo = null;
+    const GEMINI_API_KEY = 'AIzaSyCmrp8wdCRI2ym2b9AnEMqMQoLOMlKYiyA';
+    const GROQ_API_KEY = '';
 
     public static function getConnexion()
     {

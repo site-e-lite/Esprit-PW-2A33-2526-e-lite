@@ -191,11 +191,11 @@ class ForumController {
         }
     }
 
-    // ─────────────────────────────────────────────
+   
     //  RATING
-    // ─────────────────────────────────────────────
+   
 
-    /** Enregistre ou met à jour la note d'un utilisateur pour un forum */
+    
     public function raterForum($idForum, $note, $idUser = 1) {
         $db  = Config::getConnexion();
         $sql = "INSERT INTO forum_rating (idForum, idUser, note)
@@ -209,7 +209,7 @@ class ForumController {
                 'note'    => intval($note),
                 'note2'   => intval($note),
             ]);
-            // Return updated average
+          
             return $db->query(
                 "SELECT ROUND(AVG(note), 1) FROM forum_rating WHERE idForum = " . intval($idForum)
             )->fetchColumn();

@@ -3,6 +3,17 @@
 // Black Edition — with real Stats, Filtering & Rating
 require_once __DIR__ . '/../../Controller/ForumController.php';
 require_once __DIR__ . '/../../Controller/PostController.php';
+require_once __DIR__ . '/../../Controller/ChatbotController.php';
+
+// ─── Handle AI Scanner (AJAX) ───────────────────────────────
+if (isset($_POST['action']) && $_POST['action'] === 'scan_forum') {
+    $chatbot = new ChatbotController();
+    $textToScan = $_POST['text'] ?? '';
+    $evaluation = $chatbot->evaluateContentRisk($textToScan);
+    header('Content-Type: application/json');
+    echo json_encode($evaluation);
+    exit;
+}
 
 $forumController = new ForumController();
 $postController  = new PostController();
@@ -288,14 +299,27 @@ $stats  = $forumController->getStats();
         }
 
         /* ════════════════════════════════════
-           MODALS
+           MODALS & AI SCANNER
         ════════════════════════════════════ */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
         .no-results-row td { text-align: center; color: var(--light-gray); padding: 2.5rem 1rem; }
         .no-results-row .no-results-icon { font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 0.5rem; }
+
+        .action-btn.ai-scan { color: #8b5cf6; }
+        .action-btn.ai-scan:hover { color: #a78bfa; transform: scale(1.1); }
+        .scanning { animation: pulseScan 1s infinite; pointer-events: none; opacity: 0.7; }
+        @keyframes pulseScan { 0% { color: #8b5cf6; text-shadow: 0 0 0 transparent; } 50% { color: #c4b5fd; text-shadow: 0 0 10px #8b5cf6; } 100% { color: #8b5cf6; text-shadow: 0 0 0 transparent; } }
+        tr.toxic-row { background: rgba(239, 68, 68, 0.1) !important; border-left: 3px solid #ef4444; }
+
+        /* Toast Popup */
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); border-radius: 12px; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.8rem; color: #10b981; font-weight: 600; font-size: 0.9rem; transform: translateY(100px); opacity: 0; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); z-index: 9999; pointer-events: none; }
+        .toast.show { transform: translateY(0); opacity: 1; }
     </style>
 </head>
 <body>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"><i class="fas fa-check-circle"></i><span id="toastMsg"></span></div>
 
     <!-- OVERLAYS & MODALS -->
     <div class="modal-overlay" id="modalOverlay"></div>
@@ -713,6 +737,8 @@ $stats  = $forumController->getStats();
                                     </div>
                                 </td>
                                 <td>
+                                    <?php $textToScan = htmlspecialchars($f['titre'] . " - " . $f['description'], ENT_QUOTES); ?>
+                                    <button class="action-btn ai-scan" title="Scanner avec l'IA" onclick="scanForum(this, <?= $f['idForum'] ?>, '<?= $textToScan ?>')"><i class="fas fa-robot"></i></button>
                                     <button class="action-btn" title="Éditer" onclick="editForum(<?= $f['idForum'] ?>, '<?= htmlspecialchars(addslashes($f['titre']), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($f['description']), ENT_QUOTES) ?>', <?= intval($f['idCourse']) ?>)"><i class="fas fa-edit"></i></button>
                                     <a href="?delete_forum=<?= $f['idForum'] ?>" onclick="return confirm('Confirmer la suppression du forum \\'<?= htmlspecialchars(addslashes($f['titre'])) ?>\' ?');" class="action-btn delete" title="Supprimer"><i class="fas fa-trash"></i></a>
                                 </td>
@@ -798,6 +824,53 @@ $stats  = $forumController->getStats();
             banner.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + message;
             form.insertBefore(banner, form.firstChild);
             setTimeout(() => banner.remove(), 4000);
+        }
+
+        /* ── Toast Helper ── */
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.className = 'toast' + (type === 'error' ? ' error' : '');
+            t.querySelector('i').className = type === 'error' ? 'fas fa-times-circle' : (type === 'warning' ? 'fas fa-exclamation-triangle' : 'fas fa-check-circle');
+            
+            if(type === 'error') {
+                t.style.background = 'rgba(239, 68, 68, 0.15)'; t.style.borderColor = 'rgba(239, 68, 68, 0.4)'; t.style.color = '#ef4444';
+            } else if(type === 'warning') {
+                t.style.background = 'rgba(245, 158, 11, 0.15)'; t.style.borderColor = 'rgba(245, 158, 11, 0.4)'; t.style.color = '#f59e0b';
+            } else {
+                t.style.background = 'rgba(16,185,129,0.15)'; t.style.borderColor = 'rgba(16,185,129,0.4)'; t.style.color = '#10b981';
+            }
+            
+            document.getElementById('toastMsg').textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 4500);
+        }
+
+        /* ── AI Scanner Logic ── */
+        function scanForum(btn, idForum, text) {
+            if(btn.classList.contains('scanning')) return;
+            btn.classList.add('scanning');
+            const tr = btn.closest('tr');
+            
+            const fd = new FormData();
+            fd.append('action', 'scan_forum');
+            fd.append('text', text);
+
+            fetch('forum.php', { method: 'POST', body: fd })
+                .then(res => res.json())
+                .then(data => {
+                    btn.classList.remove('scanning');
+                    if (data.risk === 'High' || data.risk === 'Medium') {
+                        tr.classList.add('toxic-row');
+                        showToast(`Risque ${data.risk} détecté ! (${data.reason})`, 'error');
+                    } else {
+                        tr.classList.remove('toxic-row');
+                        showToast(`Forum #${idForum} sain.`, 'success');
+                    }
+                })
+                .catch(err => {
+                    btn.classList.remove('scanning');
+                    showToast("Erreur IA.", 'warning');
+                });
         }
 
         /* ══════════════════════════════════════

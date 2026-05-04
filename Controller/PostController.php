@@ -80,5 +80,21 @@ class PostController {
             die('Erreur: ' . $e->getMessage());
         }
     }
+
+    // Notation d'un post
+    public function raterPost($idPost, $note) {
+        $db = Config::getConnexion();
+        $sql = "UPDATE post SET rating = :note WHERE idPost = :idPost";
+        try {
+            $q = $db->prepare($sql);
+            $q->execute([
+                'note'   => intval($note),
+                'idPost' => intval($idPost)
+            ]);
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
 }
 ?>

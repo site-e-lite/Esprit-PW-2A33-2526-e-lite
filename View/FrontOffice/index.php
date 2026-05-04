@@ -6,13 +6,82 @@ $forumController = new ForumController();
 $postController = new PostController();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if (isset($_POST['action']) && $_POST['action'] === 'rate_forum') {
+        $idForum = intval($_POST['idForum']  ?? 0);
+        $note    = intval($_POST['note']     ?? 0);
+        $idUser  = intval($_POST['idUser']   ?? 8); // default to user 8
+        if ($idForum > 0 && $note >= 1 && $note <= 5) {
+            $newAvg = $forumController->raterForum($idForum, $note, $idUser);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'avg' => $newAvg]);
+        } else {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false]);
+        }
+        exit;
+    }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'rate_post') {
+        $idP   = intval($_POST['idPost'] ?? 0);
+        $note  = intval($_POST['note']   ?? 0);
+        if ($idP > 0 && $note >= 1 && $note <= 5) {
+            $success = $postController->raterPost($idP, $note);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => $success]);
+        } else {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false]);
+        }
+        exit;
+    }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'chatbot_query') {
+        require_once __DIR__ . '/../../Controller/ChatbotController.php';
+        $chatbot = new ChatbotController();
+        $res = $chatbot->handleRequest($_POST['query'] ?? '');
+        header('Content-Type: application/json');
+        echo json_encode($res);
+        exit;
+    }
+    if (isset($_POST['action']) && $_POST['action'] === 'chatbot_summarize') {
+        require_once __DIR__ . '/../../Controller/ChatbotController.php';
+        $chatbot = new ChatbotController();
+        $s = $chatbot->summarizeThread($_POST['idForum'] ?? 0);
+        header('Content-Type: application/json');
+        echo json_encode(['summary' => $s]);
+        exit;
+    }
+
     if (isset($_POST['action']) && $_POST['action'] == 'add_forum') {
+        require_once __DIR__ . '/../../Controller/ChatbotController.php';
+        $chatbot = new ChatbotController();
+        
+        $combinedText = $_POST['titre'] . " " . $_POST['description'];
+        $evaluation = $chatbot->evaluateContentRisk($combinedText);
+        
+        if ($evaluation['risk'] === 'High') {
+            $errorMsg = urlencode("Risque élevé : " . $evaluation['reason']);
+            header('Location: index.php?error=toxic&msg=' . $errorMsg . '#forum');
+            exit;
+        }
+
         $forum = new Forum($_POST['titre'], $_POST['description'], $_POST['idCourse']);
         $forumController->addForum($forum);
         header('Location: index.php#forum');
         exit;
     }
     if (isset($_POST['action']) && $_POST['action'] == 'add_post') {
+        require_once __DIR__ . '/../../Controller/ChatbotController.php';
+        $chatbot = new ChatbotController();
+        
+        $evaluation = $chatbot->evaluateContentRisk($_POST['contenu']);
+        
+        if ($evaluation['risk'] === 'High') {
+            $errorMsg = urlencode("Risque élevé : " . $evaluation['reason']);
+            header('Location: index.php?error=toxic&msg=' . $errorMsg . '#forum');
+            exit;
+        }
+
         $idF = isset($_POST['idForum']) ? $_POST['idForum'] : 1;
         $post = new Post($_POST['contenu'], 8, $idF, ''); // Default fake User #8
         $postController->addPost($post);
@@ -22,7 +91,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 $db = Config::getConnexion();
-$stmtForums = $db->query("SELECT * FROM forum ORDER BY dateCreation DESC LIMIT 10");
+$stmtForums = $db->query("
+    SELECT f.*,
+           (SELECT ROUND(AVG(note), 1) FROM forum_rating WHERE idForum = f.idForum) AS avgRating,
+           (SELECT COUNT(*) FROM forum_rating WHERE idForum = f.idForum) AS ratingCount
+    FROM forum f 
+    ORDER BY dateCreation DESC LIMIT 10
+");
 $frontForums = $stmtForums->fetchAll(PDO::FETCH_ASSOC);
 
 function getForumPosts($db, $idForum) {
@@ -42,8 +117,82 @@ function getForumPosts($db, $idForum) {
     <link rel="stylesheet" href="../assets/index.css">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ════════════════════════════════════
+           STAR RATING WIDGET (inline)
+        ════════════════════════════════════ */
+        .star-widget { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+        .star-widget .stars { display: flex; gap: 2px; }
+        .star-widget .star {
+            font-size: 1.1rem; cursor: pointer;
+            color: rgba(255,255,255,0.15);
+            transition: color 0.18s, transform 0.18s;
+        }
+        .star-widget .star.filled { color: #f59e0b; }
+        .star-widget .star:hover  { transform: scale(1.25); }
+        .star-widget .avg-label {
+            font-size: 0.78rem; color: var(--light-gray);
+            white-space: nowrap;
+        }
+
+        /* ════════════════════════════════════
+           CHATBOT UI
+        ════════════════════════════════════ */
+        .chatbot-trigger {
+            position: fixed; bottom: 30px; right: 30px;
+            width: 60px; height: 60px; border-radius: 50%;
+            background: var(--accent); color: #000;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; cursor: pointer; z-index: 1000;
+            box-shadow: 0 8px 32px rgba(234,179,8,0.3);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .chatbot-trigger:hover { transform: scale(1.1) rotate(5deg); }
+        .chatbot-window {
+            position: fixed; bottom: 100px; right: 30px;
+            width: 350px; height: 500px; border-radius: 20px;
+            background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            display: flex; flex-direction: column; overflow: hidden;
+            z-index: 1000; transform: translateY(20px); opacity: 0; pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        .chatbot-window.active { transform: translateY(0); opacity: 1; pointer-events: all; }
+        .chat-header { padding: 1.2rem; background: rgba(255,255,255,0.05); display: flex; align-items: center; gap: 0.8rem; border-bottom: 1px solid var(--glass-border); }
+        .chat-header .bot-icon { width: 35px; height: 35px; background: var(--accent); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .chat-messages { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; }
+        .msg { max-width: 80%; padding: 0.8rem 1rem; border-radius: 15px; font-size: 0.9rem; line-height: 1.4; animation: slideInChat 0.3s ease; }
+        .msg.bot { background: rgba(255,255,255,0.05); align-self: flex-start; color: var(--text-main); border-bottom-left-radius: 2px; }
+        .msg.user { background: var(--accent); color: #000; align-self: flex-end; border-bottom-right-radius: 2px; font-weight: 500; }
+        .chat-input { padding: 1rem; display: flex; gap: 0.5rem; background: rgba(0,0,0,0.2); }
+        .chat-input input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.6rem 1rem; border-radius: 20px; color: #fff; outline: none; }
+        @keyframes slideInChat { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: 0; } }
+    </style>
 </head>
 <body>
+    
+    <!-- NOTIFICATION MODERATION IA -->
+    <?php if(isset($_GET['error']) && $_GET['error'] == 'toxic'): ?>
+    <div id="aiModerationAlert" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; background: rgba(220, 38, 38, 0.9); backdrop-filter: blur(10px); color: white; padding: 1rem 2rem; border-radius: 12px; border: 1px solid #f87171; box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4); display: flex; align-items: center; gap: 1rem; animation: slideDown 0.5s ease-out;">
+        <i class="fas fa-shield-alt" style="font-size: 1.5rem;"></i>
+        <div>
+            <strong style="display: block; font-size: 1.1rem; margin-bottom: 0.2rem;">Modération IA : Contenu Bloqué</strong>
+            <span style="font-size: 0.9rem;"><?= htmlspecialchars($_GET['msg'] ?? 'Votre message contient un vocabulaire inapproprié.') ?></span>
+        </div>
+        <button onclick="this.parentElement.style.display='none'" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.2rem; margin-left: 1rem;">&times;</button>
+    </div>
+    <style>
+        @keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 20px; opacity: 1; } }
+    </style>
+    <script>
+        // Auto-hide after 8 seconds
+        setTimeout(() => {
+            const alert = document.getElementById('aiModerationAlert');
+            if(alert) alert.style.opacity = '0';
+            setTimeout(() => { if(alert) alert.style.display = 'none'; }, 500);
+        }, 8000);
+    </script>
+    <?php endif; ?>
 
     <!-- OVERLAYS & MODALS (Gestions Forms) -->
     <div class="modal-overlay" id="modalOverlay"></div>
@@ -168,7 +317,12 @@ function getForumPosts($db, $idForum) {
                 <div class="form-group full-width"><label>Titre</label><input type="text" name="titre" placeholder="Minimum 3 caractères"></div>
                 <div class="form-group full-width"><label>Description</label><textarea name="description" placeholder="Minimum 10 caractères"></textarea></div>
                 <div class="form-group"><label>ID Cours Associé</label><input type="number" name="idCourse" value="0"></div>
-                <button type="submit" class="btn-primary full-width mt-3">Créer le forum</button>
+                <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem;" class="full-width">
+                    <button type="button" class="btn-outline" style="border-color: var(--accent); color: var(--accent); padding: 0.6rem;" onclick="checkDuplicates(this.form)">
+                        <i class="fas fa-robot"></i> Vérifier si ce sujet existe déjà (IA)
+                    </button>
+                    <button type="submit" class="btn-primary" style="padding: 0.8rem;">Créer le forum</button>
+                </div>
             </form>
         </div>
     </div>
@@ -183,7 +337,12 @@ function getForumPosts($db, $idForum) {
                 <input type="hidden" name="action" value="add_post">
                 <input type="hidden" name="idForum" id="reply_forum_id">
                 <div class="form-group"><label>Votre Réponse</label><textarea name="contenu" style="min-height: 120px;" placeholder="Tapez 5 caractères minimum..."></textarea></div>
-                <button type="submit" class="btn-primary w-100 mt-3"><i class="fas fa-paper-plane"></i> Publier la réponse</button>
+                <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem;">
+                    <button type="button" class="btn-outline" style="border-color: var(--accent); color: var(--accent); padding: 0.6rem;" onclick="checkDuplicates(this.form)">
+                        <i class="fas fa-robot"></i> Voir les discussions similaires
+                    </button>
+                    <button type="submit" class="btn-primary" style="padding: 0.8rem;"><i class="fas fa-paper-plane"></i> Publier la réponse</button>
+                </div>
             </form>
         </div>
     </div>
@@ -342,9 +501,10 @@ function getForumPosts($db, $idForum) {
 
         <div class="pro-forum-container glass-card" style="padding: 0; overflow: hidden;">
             <!-- Header du Tableau Pro -->
-            <div class="forum-header" style="display: grid; grid-template-columns: 3fr 1fr 1fr; padding: 1rem 2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--glass-border); font-weight: 600; color: var(--light-gray); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;">
+            <div class="forum-header" style="display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; padding: 1rem 2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--glass-border); font-weight: 600; color: var(--light-gray); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;">
                 <div>Forum / Catégorie</div>
                 <div style="text-align: center;">Statistiques</div>
+                <div style="text-align: center;">Note ★</div>
                 <div style="text-align: right;">Activité Récente</div>
             </div>
             
@@ -357,23 +517,45 @@ function getForumPosts($db, $idForum) {
                     $lastPost = $postCount > 0 ? end($posts) : null;
                 ?>
                 <!-- Ligne Principale du Forum (Cliquable) -->
-                <div class="forum-row" style="display: grid; grid-template-columns: 3fr 1fr 1fr; padding: 1.5rem 2rem; border-bottom: 1px solid var(--glass-border); align-items: center; cursor: pointer; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.02)';" onmouseout="this.style.background='transparent';" onclick="toggleForumView(<?= $f['idForum'] ?>)">
+                <div class="forum-row" style="display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; padding: 1.5rem 2rem; border-bottom: 1px solid var(--glass-border); align-items: center; cursor: pointer; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.02)';" onmouseout="this.style.background='transparent';">
+
                     
                     <div style="display: flex; gap: 1.5rem; align-items: center;">
                         <div style="min-width: 50px; height: 50px; background: rgba(234,179,8,0.1); color: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
                             <i class="fas fa-comments"></i>
                         </div>
-                        <div>
+                        <div style="flex: 1;" onclick="toggleForumView(<?= $f['idForum'] ?>)">
                             <h3 style="margin: 0 0 0.3rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;"><?= htmlspecialchars($f['titre']) ?></h3>
                             <p style="margin: 0; font-size: 0.85rem; color: var(--light-gray); line-height: 1.4;"><?= htmlspecialchars($f['description']) ?></p>
                         </div>
                     </div>
 
-                    <div style="text-align: center; color: var(--light-gray); font-size: 0.85rem;">
+                    <div style="text-align: center; color: var(--light-gray); font-size: 0.85rem;" onclick="toggleForumView(<?= $f['idForum'] ?>)">
                         <strong style="color: var(--text-main); font-size: 1.2rem; display: block; margin-bottom: 0.2rem;"><?= $postCount ?></strong> Messages
                     </div>
 
-                    <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;">
+                    <!-- Star rating widget for forum -->
+                    <div class="star-widget" id="forumRating_<?= $f['idForum'] ?>" onclick="event.stopPropagation();">
+                        <div class="stars">
+                            <?php
+                            $avg = floatval($f['avgRating'] ?? 0);
+                            for ($s = 1; $s <= 5; $s++):
+                            ?>
+                            <span class="star <?= $avg >= $s ? 'filled' : '' ?>"
+                                  onclick="rateForum(<?= $f['idForum'] ?>, <?= $s ?>)"
+                                  data-forum="<?= $f['idForum'] ?>"
+                                  data-val="<?= $s ?>"
+                                  title="<?= $s ?> étoile(s)"
+                                  onmouseover="hoverStars(this)"
+                                  onmouseleave="resetStars(<?= $f['idForum'] ?>)">★</span>
+                            <?php endfor; ?>
+                        </div>
+                        <span class="avg-label" id="forumAvgLabel_<?= $f['idForum'] ?>">
+                            <?= $f['avgRating'] ? $f['avgRating'] . ' (' . $f['ratingCount'] . ' avis)' : 'Pas encore noté' ?>
+                        </span>
+                    </div>
+
+                    <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;" onclick="toggleForumView(<?= $f['idForum'] ?>)">
                         <?php if($lastPost): ?>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <span style="font-size: 0.8rem; color: var(--light-gray);">Par <strong style="color:var(--text-main);">#<?= $lastPost['idUser'] ?></strong></span>
@@ -390,7 +572,12 @@ function getForumPosts($db, $idForum) {
                 <div id="forum-thread-<?= $f['idForum'] ?>" style="display: none; background: rgba(0,0,0,0.3); padding: 2rem; border-bottom: 1px solid var(--glass-border); box-shadow: inset 0 5px 15px rgba(0,0,0,0.5);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <h4 style="margin: 0; color: var(--accent); font-size: 1.1rem;"><i class="fas fa-stream"></i> Fil de discussion : <?= htmlspecialchars($f['titre']) ?></h4>
-                        <button class="btn-primary" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;" onclick="openReplyModal(<?= $f['idForum'] ?>)"><i class="fas fa-reply"></i> Nouveau Message</button>
+                        <div style="display: flex; gap: 0.8rem;">
+                            <button class="btn-outline" style="padding: 0.5rem 1rem; font-size: 0.8rem; border-color: var(--accent); color: var(--accent);" onclick="summarizeAI(<?= $f['idForum'] ?>)">
+                                <i class="fas fa-robot"></i> Résumer par IA
+                            </button>
+                            <button class="btn-primary" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;" onclick="openReplyModal(<?= $f['idForum'] ?>)"><i class="fas fa-reply"></i> Nouveau Message</button>
+                        </div>
                     </div>
                     
                     <div style="display: flex; flex-direction: column; gap: 1rem;">
@@ -510,8 +697,188 @@ function getForumPosts($db, $idForum) {
         </div>
     </footer>
 
+    <!-- CHATBOT WIDGET -->
+    <div class="chatbot-trigger" onclick="toggleChat()">
+        <i class="fas fa-robot"></i>
+    </div>
+    <div class="chatbot-window" id="chatbotWindow">
+        <div class="chat-header">
+            <div class="bot-icon"><i class="fas fa-microchip"></i></div>
+            <div>
+                <strong style="display:block; font-size: 0.95rem;">e-lite AI Assistant</strong>
+                <span style="font-size: 0.75rem; color: var(--green-eco);"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> En ligne</span>
+            </div>
+            <button onclick="toggleChat()" style="margin-left: auto; background:none; border:none; color:#fff; cursor:pointer; font-size:1.2rem;">&times;</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="msg bot">Bonjour ! Je suis l'assistant intelligent e-lite. Comment puis-je vous aider aujourd'hui ? 🤖</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="chatInput" placeholder="Posez votre question..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()" style="background:var(--accent); border:none; width:35px; height:35px; border-radius:50%; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
     <script src="../assets/index.js"></script>
     <script>
+        /* ══════════════════════════════════════
+           CHATBOT LOGIC
+        ══════════════════════════════════════ */
+        function toggleChat() {
+            document.getElementById('chatbotWindow').classList.toggle('active');
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const container = document.getElementById('chatMessages');
+            const query = input.value.trim();
+            if (!query) return;
+
+            // Add user message
+            container.innerHTML += `<div class="msg user">${query}</div>`;
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+
+            // Typing indicator
+            const typingId = 'typing-' + Date.now();
+            container.innerHTML += `<div class="msg bot" id="${typingId}"><i>L'IA réfléchit...</i></div>`;
+            container.scrollTop = container.scrollHeight;
+
+            const fd = new FormData();
+            fd.append('action', 'chatbot_query');
+            fd.append('query', query);
+
+            fetch('index.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    const typing = document.getElementById(typingId);
+                    if (data.type === 'text') {
+                        typing.innerHTML = data.message;
+                    } else if (data.type === 'threads') {
+                        let html = `<p>${data.message}</p><ul style="margin-top:0.5rem; padding-left:1.2rem;">`;
+                        data.data.forEach(t => {
+                            html += `<li><a href="#forum" onclick="toggleForumView(${t.idForum})" style="color:var(--accent);">${t.titre}</a></li>`;
+                        });
+                        html += `</ul>`;
+                        typing.innerHTML = html;
+                    } else if (data.type === 'courses') {
+                        let html = `<p>${data.message}</p>`;
+                        data.data.forEach(c => {
+                            html += `<div style="margin-top:0.5rem; padding:0.5rem; background:rgba(255,255,255,0.05); border-radius:8px; border-left:3px solid var(--accent);">
+                                        <i class="fas fa-graduation-cap"></i> <a href="${c.link}" style="color:#fff; text-decoration:none;">${c.title}</a>
+                                     </div>`;
+                        });
+                        typing.innerHTML = html;
+                    }
+                    container.scrollTop = container.scrollHeight;
+                });
+        }
+
+        function summarizeAI(idForum) {
+            const fd = new FormData();
+            fd.append('action', 'chatbot_summarize');
+            fd.append('idForum', idForum);
+
+            // Open chat and show loading
+            if(!document.getElementById('chatbotWindow').classList.contains('active')) toggleChat();
+            const container = document.getElementById('chatMessages');
+            const typingId = 'summary-' + Date.now();
+            container.innerHTML += `<div class="msg bot" id="${typingId}"><i>Génération du résumé du thread #${idForum} en cours...</i></div>`;
+            container.scrollTop = container.scrollHeight;
+
+            fetch('index.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById(typingId).innerHTML = `<i class="fas fa-magic"></i> ${data.summary}`;
+                    container.scrollTop = container.scrollHeight;
+                });
+        }
+
+        /* ══════════════════════════════════════
+           FORUM STAR RATING
+        ══════════════════════════════════════ */
+        function hoverStars(el) {
+            const val  = parseInt(el.dataset.val);
+            const fid  = el.dataset.forum;
+            const wrap = document.getElementById('forumRating_' + fid);
+            wrap.querySelectorAll('.star').forEach(s => {
+                s.style.color = parseInt(s.dataset.val) <= val ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+            });
+        }
+
+        function resetStars(fid) {
+            const wrap = document.getElementById('forumRating_' + fid);
+            wrap.querySelectorAll('.star').forEach(s => {
+                s.style.color = s.classList.contains('filled') ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+            });
+        }
+
+        function rateForum(idForum, note) {
+            const fd = new FormData();
+            fd.append('action', 'rate_forum');
+            fd.append('idForum', idForum);
+            fd.append('note', note);
+            fd.append('idUser', 8); // demo default user
+
+            fetch('index.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const wrap = document.getElementById('forumRating_' + idForum);
+                    const label = document.getElementById('forumAvgLabel_' + idForum);
+                    // Update filled state
+                    wrap.querySelectorAll('.star').forEach(s => {
+                        const sv = parseInt(s.dataset.val);
+                        if (sv <= note) s.classList.add('filled');
+                        else            s.classList.remove('filled');
+                        s.style.color = sv <= note ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+                    });
+                    if (label) {
+                        label.textContent = data.avg + ' ★ (Note enregistrée)';
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+
+        /* ══════════════════════════════════════
+           POST STAR RATING
+        ══════════════════════════════════════ */
+        function ratePost(idPost, note) {
+            const fd = new FormData();
+            fd.append('action', 'rate_post');
+            fd.append('idPost', idPost);
+            fd.append('note', note);
+
+            fetch('index.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const stars = document.querySelectorAll('#postStars_' + idPost + ' .star');
+                    stars.forEach(s => {
+                        const sv = parseInt(s.dataset.val);
+                        if (sv <= note) s.classList.add('filled');
+                        else            s.classList.remove('filled');
+                    });
+                    const lbl = document.getElementById('postRatingLabel_' + idPost);
+                    if (lbl) lbl.textContent = note + '/5 ★';
+                })
+                .catch(err => console.error(err));
+        }
+
+        function checkDuplicates(form) {
+            const text = form.titre ? form.titre.value : form.contenu.value;
+            if (text.trim().length < 4) {
+                alert('Veuillez saisir un texte plus long pour la recherche.');
+                return;
+            }
+            
+            // Interaction avec le chatbot
+            const input = document.getElementById('chatInput');
+            input.value = "Existe-t-il déjà un sujet sur : " + text;
+            if(!document.getElementById('chatbotWindow').classList.contains('active')) toggleChat();
+            sendChat();
+        }
+
         function openReplyModal(idForum) {
             document.getElementById('reply_forum_id').value = idForum;
             if (typeof openModal === 'function') {
