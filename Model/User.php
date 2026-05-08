@@ -36,7 +36,7 @@ class User {
         return $stmt->fetch();
     }
 
-    public static function authenticate(string $email, string $password): array|false {
+    public static function authenticate($email, $password) {
         $user = self::findByEmail($email);
         if ($user && password_verify($password, $user['motDePasse'])) {
             return $user;

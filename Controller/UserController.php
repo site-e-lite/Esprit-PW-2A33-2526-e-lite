@@ -16,27 +16,44 @@ class UserController {
 
     public function login() {
         if ($this->isLoggedIn()) {
-            $this->redirect($this->isStudent() ? "/student/dashboard" : "/admin/dashboard");
+            $this->redirect($this->isStudent() ? '/student/dashboard' : '/admin/dashboard');
         }
-        if ($_SERVER["REQUEST_METHOD"] === "POST") {
-            $email = filter_var(trim($_POST["email"] ?? ""), FILTER_SANITIZE_EMAIL);
-            $password = $_POST["password"] ?? "";
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $user_captcha = (int)($_POST['captcha'] ?? 0);
+            $email = filter_var(trim($_POST['email'] ?? ''), FILTER_SANITIZE_EMAIL);
+            $password = $_POST['password'] ?? '';
+            
+            if (!isset($_SESSION['captcha_result']) || $user_captcha !== $_SESSION['captcha_result']) {
+                $error = "Hell no bot";
+                $_SESSION['captcha_a'] = rand(1, 10);
+                $_SESSION['captcha_b'] = rand(1, 10);
+                $_SESSION['captcha_result'] = $_SESSION['captcha_a'] + $_SESSION['captcha_b'];
+                include __DIR__ . '/../View/layout/header.php';
+                include __DIR__ . '/../View/auth/login.php';
+                include __DIR__ . '/../View/layout/footer.php';
+                return;
+            }
+            
             $user = User::authenticate($email, $password);
-        if ($email == "admin@e-lite.com") { $user["role_nom"] = "admin"; }
             if ($user) {
-                $_SESSION["user_id"] = $user["idUser"];
-                $_SESSION["user_role"] = $user["idRole"];
-                $_SESSION["role_nom"] = $user["role_nom"];
-                $_SESSION["user_nom"] = $user["nom"];
-                $_SESSION["user_prenom"] = $user["prenom"];
-                $this->redirect($this->isStudent() ? "/student/dashboard" : "/admin/dashboard");
+                $_SESSION['user_id'] = $user['idUser'];
+                $_SESSION['user_role'] = $user['idRole'];
+                $_SESSION['role_nom'] = $user['role_nom'];
+                $_SESSION['user_nom'] = $user['nom'];
+                $_SESSION['user_prenom'] = $user['prenom'];
+                unset($_SESSION['captcha_a'], $_SESSION['captcha_b'], $_SESSION['captcha_result']);
+                $this->redirect($this->isStudent() ? '/student/dashboard' : '/admin/dashboard');
             } else {
                 $error = "Email ou mot de passe incorrect.";
             }
+        } else {
+            $_SESSION['captcha_a'] = rand(1, 10);
+            $_SESSION['captcha_b'] = rand(1, 10);
+            $_SESSION['captcha_result'] = $_SESSION['captcha_a'] + $_SESSION['captcha_b'];
         }
-        include __DIR__ . "/../View/layout/header.php";
-        include __DIR__ . "/../View/auth/login.php";
-        include __DIR__ . "/../View/layout/footer.php";
+        include __DIR__ . '/../View/layout/header.php';
+        include __DIR__ . '/../View/auth/login.php';
+        include __DIR__ . '/../View/layout/footer.php';
     }
 
     public function logout() { session_destroy(); $this->redirect('/login'); }
@@ -128,34 +145,31 @@ class UserController {
     public function deleteAccount() {
         if (!$this->isLoggedIn()) $this->redirect('/login');
         User::hardDelete($_SESSION['user_id']);
-        session_destroy();
-        setcookie(session_name(), '', time() - 3600, '/');
-        header("Location: /");
-        exit;
+        session_destroy(); setcookie(session_name(), '', time() - 3600, '/');
+        header("Location: /"); exit;
     }
 
     public function adminDashboard() {
-        if (!$this->isLoggedIn()) $this->redirect("/login");
-        if (!isset($_SESSION["role_nom"]) || strtolower($_SESSION["role_nom"]) != "admin") $this->redirect("/");
-        if ($_SERVER["REQUEST_METHOD"] === "POST") {
-            if (isset($_POST["change_role"]) && ($_SESSION["user_role"] ?? 0) == 1) {
-                $userId = (int)$_POST["user_id"]; $newRoleId = (int)$_POST["new_role"];
-                if ($userId != $_SESSION["user_id"]) { User::changeRole($userId, $newRoleId); $_SESSION["flash"]["success"] = "Rôle modifié."; }
-                $this->redirect("/admin/dashboard");
-            } elseif (isset($_POST["ban_user"])) {
-                $userId = (int)$_POST["user_id"];
-                if ($userId != $_SESSION["user_id"]) { User::softDelete($userId); $_SESSION["flash"]["success"] = "Utilisateur banni."; }
-                $this->redirect("/admin/dashboard");
-            } elseif (isset($_POST["delete_user"])) {
-                $userId = (int)$_POST["user_id"];
-                if ($userId != $_SESSION["user_id"]) { User::hardDelete($userId); $_SESSION["flash"]["success"] = "Utilisateur supprimé définitivement."; }
-                $this->redirect("/admin/dashboard");
+        if (!$this->isLoggedIn() || !$this->isAdminOrFormateur()) $this->redirect('/login');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (isset($_POST['change_role']) && ($_SESSION['user_role'] ?? 0) == 1) {
+                $userId = (int)$_POST['user_id']; $newRoleId = (int)$_POST['new_role'];
+                if ($userId != $_SESSION['user_id']) { User::changeRole($userId, $newRoleId); $_SESSION['flash']['success'] = "Rôle modifié."; }
+                $this->redirect('/admin/dashboard');
+            } elseif (isset($_POST['ban_user'])) {
+                $userId = (int)$_POST['user_id'];
+                if ($userId != $_SESSION['user_id']) { User::softDelete($userId); $_SESSION['flash']['success'] = "Utilisateur banni."; }
+                $this->redirect('/admin/dashboard');
+            } elseif (isset($_POST['delete_user'])) {
+                $userId = (int)$_POST['user_id'];
+                if ($userId != $_SESSION['user_id']) { User::hardDelete($userId); $_SESSION['flash']['success'] = "Utilisateur supprimé définitivement."; }
+                $this->redirect('/admin/dashboard');
             }
         }
-        $users = User::getAll(); $roles = Role::getAll(); $currentRoleId = $_SESSION["user_role"] ?? 0;
-        include __DIR__ . "/../View/layout/header.php";
-        include __DIR__ . "/../View/admin/dashboard.php";
-        include __DIR__ . "/../View/layout/footer.php";
+        $users = User::getAll(); $roles = Role::getAll(); $currentRoleId = $_SESSION['user_role'] ?? 0;
+        include __DIR__ . '/../View/layout/header.php';
+        include __DIR__ . '/../View/admin/dashboard.php';
+        include __DIR__ . '/../View/layout/footer.php';
     }
 
     public function studentDashboard() {
@@ -176,25 +190,21 @@ class UserController {
     public function googleCallback() {
         $client = new Google_Client();
         $client->setClientId(GOOGLE_CLIENT_ID); $client->setClientSecret(GOOGLE_CLIENT_SECRET);
-        $client->setRedirectUri(GOOGLE_REDIRECT_URI); $client->authenticate($_GET["code"]);
+        $client->setRedirectUri(GOOGLE_REDIRECT_URI); $client->authenticate($_GET['code']);
         $oauth = new Google_Service_Oauth2($client); $userInfo = $oauth->userinfo->get();
         $email = $userInfo->email; $user = User::findByEmail($email);
         if (!$user) {
-            $pdo = Config::getConnexion(); $stmt = $pdo->prepare("SELECT idRole FROM role WHERE nom = etudiant");
+            $pdo = Config::getConnexion(); $stmt = $pdo->prepare("SELECT idRole FROM role WHERE nom = 'etudiant'");
             $stmt->execute(); $idRole = $stmt->fetchColumn() ?: 3;
-            $data = ["nom" => $userInfo->familyName ?? "", "prenom" => $userInfo->givenName ?? "", "email" => $email,
-                     "motDePasse" => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), "idRole" => $idRole, "statut" => "actif"];
+            $data = ['nom' => $userInfo->familyName ?? '', 'prenom' => $userInfo->givenName ?? '', 'email' => $email,
+                     'motDePasse' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), 'idRole' => $idRole, 'statut' => 'actif'];
             $userId = User::create($data); $user = User::findById($userId);
         }
-        $_SESSION["user_id"] = $user["idUser"];
-        $_SESSION["user_role"] = $user["idRole"];
-        $_SESSION["role_nom"] = $user["role_nom"];
-        $_SESSION["user_nom"] = $user["nom"];
-        $_SESSION["user_prenom"] = $user["prenom"];
-        $this->redirect("/");
+        $_SESSION['user_id'] = $user['idUser']; $_SESSION['user_role'] = $user['idRole']; $_SESSION['role_nom'] = $user['role_nom'];
+        $_SESSION['user_nom'] = $user['nom']; $_SESSION['user_prenom'] = $user['prenom'];
+        $this->redirect('/');
     }
 
-    // Forgot password using email + user ID
     public function forgotPassword() {
         if ($this->isLoggedIn()) $this->redirect('/');
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -204,7 +214,9 @@ class UserController {
             if ($user && $user['idUser'] === $userId) {
                 $_SESSION['reset_user_id'] = $user['idUser'];
                 $this->redirect('/reset-password');
-            } else $error = "Email ou ID utilisateur invalide.";
+            } else {
+                $error = "Email ou ID utilisateur invalide.";
+            }
         }
         include __DIR__ . '/../View/layout/header.php';
         include __DIR__ . '/../View/auth/forgot.php';
@@ -212,31 +224,26 @@ class UserController {
     }
 
     public function resetPassword() {
-        if ($this->isLoggedIn()) $this->redirect("/");
-        if (!isset($_SESSION["reset_user_id"])) { $this->redirect("/forgot"); }
-        if ($_SERVER["REQUEST_METHOD"] === "POST") {
-            $password = $_POST["password"] ?? "";
-            $confirm = $_POST["confirm_password"] ?? "";
+        if ($this->isLoggedIn()) $this->redirect('/');
+        if (!isset($_SESSION['reset_user_id'])) $this->redirect('/forgot');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $password = $_POST['password'] ?? '';
+            $confirm = $_POST['confirm_password'] ?? '';
             if (strlen($password) < 6) {
                 $error = "Mot de passe trop court (min 6).";
             } elseif ($password !== $confirm) {
                 $error = "Les mots de passe ne correspondent pas.";
             } else {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $userId = $_SESSION["reset_user_id"];
-                $result = User::update($userId, ["motDePasse" => $hash]);
-                if ($result) {
-                    unset($_SESSION["reset_user_id"]);
-                    $_SESSION["flash"]["success"] = "Mot de passe réinitialisé avec succès.";
-                    $this->redirect("/login");
-                } else {
-                    $error = "Erreur lors de la mise à jour du mot de passe.";
-                }
+                User::update($_SESSION['reset_user_id'], ['motDePasse' => $hash]);
+                unset($_SESSION['reset_user_id']);
+                $_SESSION['flash']['success'] = "Mot de passe réinitialisé avec succès.";
+                $this->redirect('/login');
             }
         }
-        include __DIR__ . "/../View/layout/header.php";
-        include __DIR__ . "/../View/auth/reset-password.php";
-        include __DIR__ . "/../View/layout/footer.php";
+        include __DIR__ . '/../View/layout/header.php';
+        include __DIR__ . '/../View/auth/reset-password.php';
+        include __DIR__ . '/../View/layout/footer.php';
     }
 
     public function resetSuccess() {
@@ -249,12 +256,11 @@ class UserController {
     public function removePhoto() {
         if (!$this->isLoggedIn()) $this->redirect('/login');
         $user = User::findById($_SESSION['user_id']);
-        if (!empty($user['photo']) && file_exists($user['photo'])) unlink($user['photo']);
+        if (!empty($user['photo']) && file_exists($user['photo'])) {
+            unlink($user['photo']);
+        }
         User::update($_SESSION['user_id'], ['photo' => null]);
         $_SESSION['flash']['success'] = "Photo de profil supprimée.";
         $this->redirect('/profile');
     }
-
-    // Dummy verifyCode to avoid 404 if route still exists
-    public function verifyCode() { $this->redirect('/forgot'); }
 }

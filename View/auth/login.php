@@ -3,18 +3,13 @@
     <?php if (isset($error)): ?>
         <div class="alert error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
-    <?php if (isset($_SESSION['flash']['success'])): ?>
-        <div class="alert success"><?= $_SESSION['flash']['success']; unset($_SESSION['flash']['success']); ?></div>
-    <?php endif; ?>
     <form method="POST" action="/login">
         <div class="form-group"><label>Email</label><input type="email" name="email" required></div>
         <div class="form-group"><label>Mot de passe</label><input type="password" name="password" required></div>
-    <div class="form-group">
-        <label>Code de sécurité : <?php echo $_SESSION["captcha_num1"] ?? 2; ?> + <?php echo $_SESSION["captcha_num2"] ?? 3; ?> = ?</label>
-        <input type="text" name="captcha" required autocomplete="off">
-    </div>
-    <div class="form-group">
-    </div>
+        <div class="form-group">
+            <label>Combien font <?= $_SESSION['captcha_a'] ?> + <?= $_SESSION['captcha_b'] ?> ?</label>
+            <input type="text" name="captcha" required>
+        </div>
         <button type="submit" class="btn-primary">Se connecter</button>
     </form>
     <div class="social-login">
@@ -23,5 +18,5 @@
             <a href="/login/google" class="social-btn google"><i class="fab fa-google"></i> Google</a>
         </div>
     </div>
-    <p style="margin-top:1rem;"><a href="/forgot">Mot de passe oublié ?</a></p>
+    <p><a href="/forgot">Mot de passe oublié ?</a></p>
 </div>

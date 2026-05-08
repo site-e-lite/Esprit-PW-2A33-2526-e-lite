@@ -45,3 +45,8 @@
         <button type="submit" class="btn-danger">Supprimer mon compte</button>
     </form>
 </div>
+
+    <hr>
+    <form method="POST" action="/profile/remove-photo">
+        <button type="submit" class="btn-outline" onclick="return confirm('Supprimer la photo de profil ?')">Supprimer la photo</button>
+    </form>
