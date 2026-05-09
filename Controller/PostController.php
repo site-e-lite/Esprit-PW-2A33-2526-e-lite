@@ -30,8 +30,10 @@ class PostController {
                 'idUser'      => $post->getIdUser()  ?: null,
                 'idForum'     => $post->getIdForum() ?: null
             ]);
+            return true;
         } catch (Exception $e) {
-            echo 'Erreur: ' . $e->getMessage();
+            error_log('addPost: ' . $e->getMessage());
+            return false;
         }
     }
 

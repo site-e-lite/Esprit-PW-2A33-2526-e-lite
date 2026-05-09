@@ -60,20 +60,42 @@ class ForumController {
         }
     }
 
-    /** Ajouter un forum */
+    /**
+     * idCourse obligatoire (FK vers course). 0 ou invalide → premier cours disponible.
+     */
+    private function resolveForumCourseId($rawIdCourse): ?int {
+        $id = (int) $rawIdCourse;
+        $db = Config::getConnexion();
+        if ($id > 0) {
+            $s = $db->prepare('SELECT idCourse FROM course WHERE idCourse = ?');
+            $s->execute([$id]);
+            if ($s->fetchColumn()) {
+                return $id;
+            }
+        }
+        $fallback = $db->query('SELECT idCourse FROM course ORDER BY idCourse ASC LIMIT 1')->fetchColumn();
+        return $fallback ? (int) $fallback : null;
+    }
+
+    /** Ajouter un forum ; retourne false si aucun cours en base ou erreur SQL */
     public function addForum($forum) {
-        $sql = "INSERT INTO forum (titre, description, idCourse)
-                VALUES (:titre, :description, :idCourse)";
+        $idCourse = $this->resolveForumCourseId($forum->getIdCourse());
+        if ($idCourse === null) {
+            return false;
+        }
+        $sql = 'INSERT INTO forum (titre, description, idCourse)
+                VALUES (:titre, :description, :idCourse)';
         $db = Config::getConnexion();
         try {
             $query = $db->prepare($sql);
-            $query->execute([
+            return $query->execute([
                 'titre'       => $forum->getTitre(),
                 'description' => $forum->getDescription(),
-                'idCourse'    => $forum->getIdCourse() ?: null
+                'idCourse'    => $idCourse,
             ]);
         } catch (Exception $e) {
-            echo 'Erreur: ' . $e->getMessage();
+            error_log('addForum: ' . $e->getMessage());
+            return false;
         }
     }
 
@@ -88,10 +110,14 @@ class ForumController {
                     idCourse    = :idCourse
                  WHERE idForum  = :idForum'
             );
+            $resolved = $this->resolveForumCourseId($forum->getIdCourse());
+            if ($resolved === null) {
+                throw new PDOException('Aucun cours valide pour ce forum.');
+            }
             $query->execute([
                 'titre'       => $forum->getTitre(),
                 'description' => $forum->getDescription(),
-                'idCourse'    => $forum->getIdCourse() ?: null,
+                'idCourse'    => $resolved,
                 'idForum'     => $id
             ]);
         } catch (PDOException $e) {

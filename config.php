@@ -1,4 +1,7 @@
 <?php
+/**
+ * Connexion PDO vers la base MySQL nommée elite_forum (à créer / importer depuis une sauvegarde SQL hors dépôt).
+ */
 class Config
 {
     private static $pdo = null;
@@ -10,7 +13,7 @@ class Config
         if (!isset(self::$pdo)) {
             try {
                 self::$pdo = new PDO(
-                    'mysql:host=localhost;dbname=e_lite',
+                    'mysql:host=localhost;dbname=elite_forum;charset=utf8mb4',
                     'root',
                     '',
                     [
@@ -23,6 +26,46 @@ class Config
             }
         }
         return self::$pdo;
+    }
+
+    /**
+     * Premier utilisateur en base, sinon création d'un compte démo pour le front-office.
+     * Nécessaire car post.idUser est NOT NULL + FK vers user (un id fictif 8 échouait si la table user était vide).
+     */
+    public static function getOrCreateFrontOfficeUserId(): int
+    {
+        $db = self::getConnexion();
+        $row = $db->query('SELECT idUser FROM user ORDER BY idUser ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            return (int) $row['idUser'];
+        }
+
+        $email = 'forum-demo@e-lite.local';
+        try {
+            $stmt = $db->prepare(
+                'INSERT INTO user (nom, prenom, email, motDePasse, role) VALUES (?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([
+                'Forum',
+                'Visiteur',
+                $email,
+                password_hash('demo', PASSWORD_DEFAULT),
+                'etudiant',
+            ]);
+            return (int) $db->lastInsertId();
+        } catch (PDOException $e) {
+            $q = $db->prepare('SELECT idUser FROM user WHERE email = ?');
+            $q->execute([$email]);
+            $again = $q->fetch(PDO::FETCH_ASSOC);
+            if ($again) {
+                return (int) $again['idUser'];
+            }
+            $fallback = $db->query('SELECT idUser FROM user ORDER BY idUser ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+            if ($fallback) {
+                return (int) $fallback['idUser'];
+            }
+            throw $e;
+        }
     }
 }
 ?>

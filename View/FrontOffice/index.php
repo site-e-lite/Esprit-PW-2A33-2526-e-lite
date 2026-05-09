@@ -2,14 +2,18 @@
 require_once __DIR__ . '/../../Controller/ForumController.php';
 require_once __DIR__ . '/../../Controller/PostController.php';
 
+/** Chemin de cette page (sans query) — évite de poster vers /index.php racine qui perd le POST (redirect 302). */
+$frontBasePath = strtok($_SERVER['REQUEST_URI'] ?? '/', '?') ?: '/';
+
 $forumController = new ForumController();
 $postController = new PostController();
+$frontOfficeUserId = Config::getOrCreateFrontOfficeUserId();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['action']) && $_POST['action'] === 'rate_forum') {
         $idForum = intval($_POST['idForum']  ?? 0);
         $note    = intval($_POST['note']     ?? 0);
-        $idUser  = intval($_POST['idUser']   ?? 8); // default to user 8
+        $idUser  = intval($_POST['idUser']   ?? $frontOfficeUserId);
         if ($idForum > 0 && $note >= 1 && $note <= 5) {
             $newAvg = $forumController->raterForum($idForum, $note, $idUser);
             header('Content-Type: application/json');
@@ -61,13 +65,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         if ($evaluation['risk'] === 'High') {
             $errorMsg = urlencode("Risque élevé : " . $evaluation['reason']);
-            header('Location: index.php?error=toxic&msg=' . $errorMsg . '#forum');
+            header('Location: ' . $frontBasePath . '?error=toxic&msg=' . $errorMsg . '#forum');
             exit;
         }
 
-        $forum = new Forum($_POST['titre'], $_POST['description'], $_POST['idCourse']);
-        $forumController->addForum($forum);
-        header('Location: index.php#forum');
+        $forum = new Forum($_POST['titre'], $_POST['description'], $_POST['idCourse'] ?? 0);
+        if (!$forumController->addForum($forum)) {
+            header('Location: ' . $frontBasePath . '?error=no_course&msg=' . urlencode('Aucun cours en base : ajoute au moins un cours (back-office ou SQL) avant de créer un forum. ID cours 0 = premier cours disponible.') . '#forum');
+            exit;
+        }
+        header('Location: ' . $frontBasePath . '#forum');
         exit;
     }
     if (isset($_POST['action']) && $_POST['action'] == 'add_post') {
@@ -78,14 +85,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         if ($evaluation['risk'] === 'High') {
             $errorMsg = urlencode("Risque élevé : " . $evaluation['reason']);
-            header('Location: index.php?error=toxic&msg=' . $errorMsg . '#forum');
+            header('Location: ' . $frontBasePath . '?error=toxic&msg=' . $errorMsg . '#forum');
             exit;
         }
 
-        $idF = isset($_POST['idForum']) ? $_POST['idForum'] : 1;
-        $post = new Post($_POST['contenu'], 8, $idF, ''); // Default fake User #8
-        $postController->addPost($post);
-        header('Location: index.php#forum');
+        $idF = max(1, (int) ($_POST['idForum'] ?? 1));
+        $post = new Post(trim((string) ($_POST['contenu'] ?? '')), $frontOfficeUserId, $idF, '');
+        if (!$postController->addPost($post)) {
+            header('Location: ' . $frontBasePath . '?error=post&msg=' . urlencode("Enregistrement impossible (utilisateur ou forum invalide). Réessayez.") . '#forum');
+            exit;
+        }
+        header('Location: ' . $frontBasePath . '#forum');
         exit;
     }
 }
@@ -192,6 +202,11 @@ function getForumPosts($db, $idForum) {
             setTimeout(() => { if(alert) alert.style.display = 'none'; }, 500);
         }, 8000);
     </script>
+    <?php elseif (isset($_GET['error']) && in_array($_GET['error'], ['no_course', 'forum_db', 'post'], true)): ?>
+    <div style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; background: rgba(180, 83, 9, 0.95); color: white; padding: 1rem 2rem; border-radius: 12px; border: 1px solid #fbbf24; max-width: min(560px, 92vw);">
+        <strong>Forum</strong>
+        <p style="margin: 0.4rem 0 0;"><?= htmlspecialchars($_GET['msg'] ?? 'Impossible d\'enregistrer le forum.', ENT_QUOTES, 'UTF-8') ?></p>
+    </div>
     <?php endif; ?>
 
     <!-- OVERLAYS & MODALS (Gestions Forms) -->
@@ -312,11 +327,11 @@ function getForumPosts($db, $idForum) {
             <button class="close-btn" onclick="closeModal('modalAddForum')">&times;</button>
         </div>
         <div class="modal-body">
-            <form action="index.php" method="POST" class="glass-form form-grid" onsubmit="return validateForum(this)">
+            <form action="" method="POST" class="glass-form form-grid" onsubmit="return validateForum(this)">
                 <input type="hidden" name="action" value="add_forum">
                 <div class="form-group full-width"><label>Titre</label><input type="text" name="titre" placeholder="Minimum 3 caractères"></div>
                 <div class="form-group full-width"><label>Description</label><textarea name="description" placeholder="Minimum 10 caractères"></textarea></div>
-                <div class="form-group"><label>ID Cours Associé</label><input type="number" name="idCourse" value="0"></div>
+                <div class="form-group"><label>ID cours (0 = premier cours en base)</label><input type="number" name="idCourse" value="0" min="0"></div>
                 <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem;" class="full-width">
                     <button type="button" class="btn-outline" style="border-color: var(--accent); color: var(--accent); padding: 0.6rem;" onclick="checkDuplicates(this.form)">
                         <i class="fas fa-robot"></i> Vérifier si ce sujet existe déjà (IA)
@@ -333,7 +348,7 @@ function getForumPosts($db, $idForum) {
             <button class="close-btn" onclick="closeModal('modalAddPost')">&times;</button>
         </div>
         <div class="modal-body">
-            <form action="index.php" method="POST" class="glass-form" onsubmit="return validatePost(this)">
+            <form action="" method="POST" class="glass-form" onsubmit="return validatePost(this)">
                 <input type="hidden" name="action" value="add_post">
                 <input type="hidden" name="idForum" id="reply_forum_id">
                 <div class="form-group"><label>Votre Réponse</label><textarea name="contenu" style="min-height: 120px;" placeholder="Tapez 5 caractères minimum..."></textarea></div>
@@ -612,7 +627,7 @@ function getForumPosts($db, $idForum) {
 
                                     <!-- Inline Reply Form (hidden by default) -->
                                     <div id="<?= $replyId ?>" data-reply-box style="display: none; padding: 1.2rem 1.5rem 1.5rem 1.5rem; border-top: 1px solid rgba(234,179,8,0.15); background: rgba(234,179,8,0.03);">
-                                        <form action="index.php" method="POST" novalidate onsubmit="return validatePost(this)">
+                                        <form action="" method="POST" novalidate onsubmit="return validatePost(this)">
                                             <input type="hidden" name="action" value="add_post">
                                             <input type="hidden" name="idForum" value="<?= $f['idForum'] ?>">
                                             <div style="margin-bottom: 0.8rem;">
@@ -721,6 +736,9 @@ function getForumPosts($db, $idForum) {
 
     <script src="../assets/index.js"></script>
     <script>
+        /* Même URL que la page courante (évite fetch/index.php → mauvais script si URL = / ou router). */
+        const FORUM_POST_URL = window.location.pathname || '/';
+
         /* ══════════════════════════════════════
            CHATBOT LOGIC
         ══════════════════════════════════════ */
@@ -748,7 +766,7 @@ function getForumPosts($db, $idForum) {
             fd.append('action', 'chatbot_query');
             fd.append('query', query);
 
-            fetch('index.php', { method: 'POST', body: fd })
+            fetch(FORUM_POST_URL, { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
                     const typing = document.getElementById(typingId);
@@ -786,7 +804,7 @@ function getForumPosts($db, $idForum) {
             container.innerHTML += `<div class="msg bot" id="${typingId}"><i>Génération du résumé du thread #${idForum} en cours...</i></div>`;
             container.scrollTop = container.scrollHeight;
 
-            fetch('index.php', { method: 'POST', body: fd })
+            fetch(FORUM_POST_URL, { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
                     document.getElementById(typingId).innerHTML = `<i class="fas fa-magic"></i> ${data.summary}`;
@@ -818,9 +836,9 @@ function getForumPosts($db, $idForum) {
             fd.append('action', 'rate_forum');
             fd.append('idForum', idForum);
             fd.append('note', note);
-            fd.append('idUser', 8); // demo default user
+            fd.append('idUser', <?= (int) $frontOfficeUserId ?>);
 
-            fetch('index.php', { method: 'POST', body: fd })
+            fetch(FORUM_POST_URL, { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) return;
@@ -849,7 +867,7 @@ function getForumPosts($db, $idForum) {
             fd.append('idPost', idPost);
             fd.append('note', note);
 
-            fetch('index.php', { method: 'POST', body: fd })
+            fetch(FORUM_POST_URL, { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) return;

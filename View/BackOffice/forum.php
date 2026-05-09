@@ -455,7 +455,7 @@ $stats  = $forumController->getStats();
                 <p style="color: var(--light-gray); margin-top: 0.5rem;">Statistiques en temps réel, filtrage avancé et notation par la communauté.</p>
             </div>
             <div class="admin-profile">
-                <button class="btn-primary" style="margin-right:1rem; padding: 0.6rem 1.2rem; font-size: 0.85rem;" onclick="openModal('modalAddForum')"><i class="fas fa-plus"></i> Forum</button>
+                <a href="forum_add.php" class="btn-primary" style="margin-right:1rem; padding: 0.6rem 1.2rem; font-size: 0.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem;"><i class="fas fa-plus"></i> Forum</a>
                 <button class="btn-primary" style="margin-right:2rem; padding: 0.6rem 1.2rem; font-size: 0.85rem;" onclick="openModal('modalAddPost')"><i class="fas fa-plus"></i> Message</button>
                 <div style="text-align: right;">
                     <strong style="display: block; color: var(--text-main);">Super Admin</strong>

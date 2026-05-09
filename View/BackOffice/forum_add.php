@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../Controller/ForumController.php';
 $forumController = new ForumController();
+$formError       = null;
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $titre       = trim($_POST['titre'] ?? '');
@@ -12,9 +13,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (strlen($titre) >= 3 && strlen($description) >= 10 && $descriptionValide) {
         $forum = new Forum($titre, $description, $idCourse);
-        $forumController->addForum($forum);
-        header('Location: forums_list.php?added=1');
-        exit;
+        if ($forumController->addForum($forum)) {
+            header('Location: forums_list.php?added=1');
+            exit;
+        }
+        $formError = "Impossible d'ajouter le forum : aucun cours en base ou erreur SQL. Ajoute un cours d'abord.";
     }
 }
 ?>
@@ -124,6 +127,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="form-card">
         <div class="card-title"><i class="fas fa-plus-circle"></i> Créer un Forum</div>
         <p class="card-subtitle">Remplissez les informations pour ouvrir un nouveau sujet de discussion.</p>
+
+        <?php if (!empty($formError)): ?>
+            <p class="card-subtitle" style="color:#ef4444; border:1px solid rgba(239,68,68,0.4); padding:0.75rem 1rem; border-radius:12px; background:rgba(239,68,68,0.08);"><?= htmlspecialchars($formError, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
 
         <!-- Step Progress -->
         <div class="steps" id="stepsBar">
