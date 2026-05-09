@@ -1,8 +1,129 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../Model/Forum/Forum.php';
+require_once __DIR__ . '/../../Utils/PermissionHelper.php';
+require_once __DIR__ . '/../../Utils/EnrollmentHelper.php';
 
 class ForumController {
+
+    // ─────────────────────────────────────────────
+    //  PERMISSION & ACCESS CONTROL
+    // ─────────────────────────────────────────────
+
+    /**
+     * Check if user can access forum for a course
+     * @param int $userId User ID
+     * @param int $courseId Course ID
+     * @return bool True if user has access
+     */
+    public function canAccessCourseForum(int $userId, int $courseId): bool
+    {
+        // Teacher can access their own course forums
+        if (PermissionHelper::isTeacherOfCourse($userId, $courseId)) {
+            return true;
+        }
+
+        // Admin can access any forum
+        if (PermissionHelper::isAdmin($userId)) {
+            return true;
+        }
+
+        // Students must be enrolled in the course
+        return PermissionHelper::isEnrolledInCourse($userId, $courseId);
+    }
+
+    /**
+     * Check if user can post in a forum (linked to course)
+     * @param int $userId User ID
+     * @param int $forumId Forum ID
+     * @return bool True if user can post
+     */
+    public function canPostInForum(int $userId, int $forumId): bool
+    {
+        try {
+            $db = Config::getConnexion();
+            $stmt = $db->prepare("SELECT idCourse FROM forum WHERE idForum = :id");
+            $stmt->execute([':id' => $forumId]);
+            $courseId = $stmt->fetchColumn();
+
+            if (!$courseId) {
+                return false;
+            }
+
+            return EnrollmentHelper::canPostInCourseForum($userId, $courseId);
+        } catch (Exception $e) {
+            error_log("Error checking forum post permission: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get forums accessible to a user (respects enrollment and permissions)
+     * @param int $userId User ID
+     * @return array Forums the user can access
+     */
+    public function getAccessibleForums(int $userId): array
+    {
+        try {
+            $db = Config::getConnexion();
+            
+            // Admins see all forums
+            if (PermissionHelper::isAdmin($userId)) {
+                $stmt = $db->prepare("
+                    SELECT f.*,
+                           COUNT(DISTINCT p.idPost) AS postCount,
+                           c.titre as courseTitre
+                    FROM forum f
+                    LEFT JOIN post p ON p.idForum = f.idForum
+                    LEFT JOIN course c ON f.idCourse = c.idCourse
+                    GROUP BY f.idForum
+                    ORDER BY f.dateCreation DESC
+                ");
+                $stmt->execute();
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            // Teachers see forums for their courses + enrolled courses
+            if (PermissionHelper::isTeacher($userId)) {
+                $stmt = $db->prepare("
+                    SELECT f.*,
+                           COUNT(DISTINCT p.idPost) AS postCount,
+                           c.titre as courseTitre,
+                           tc.idTeacherCourse as isTeacherOf
+                    FROM forum f
+                    LEFT JOIN post p ON p.idForum = f.idForum
+                    LEFT JOIN course c ON f.idCourse = c.idCourse
+                    LEFT JOIN teacher_course tc ON tc.idCourse = f.idCourse AND tc.idUser = :userId
+                    LEFT JOIN enrollment e ON e.idCourse = f.idCourse AND e.idUser = :userId
+                    WHERE tc.idTeacherCourse IS NOT NULL OR (e.idEnrollment IS NOT NULL AND e.statut = 'actif')
+                    GROUP BY f.idForum
+                    ORDER BY f.dateCreation DESC
+                ");
+                $stmt->execute([':userId' => $userId]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            // Students only see forums for courses they're enrolled in
+            $stmt = $db->prepare("
+                SELECT f.*,
+                       COUNT(DISTINCT p.idPost) AS postCount,
+                       c.titre as courseTitre,
+                       e.progression as courseProgress
+                FROM forum f
+                LEFT JOIN post p ON p.idForum = f.idForum
+                LEFT JOIN course c ON f.idCourse = c.idCourse
+                LEFT JOIN enrollment e ON e.idCourse = f.idCourse AND e.idUser = :userId
+                WHERE e.idEnrollment IS NOT NULL AND e.statut = 'actif'
+                GROUP BY f.idForum
+                ORDER BY f.dateCreation DESC
+            ");
+            $stmt->execute([':userId' => $userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error fetching accessible forums: " . $e->getMessage());
+            return [];
+        }
+    }
 
     // ─────────────────────────────────────────────
     //  CRUD OPERATIONS
@@ -57,6 +178,43 @@ class ForumController {
             return $query;
         } catch (Exception $e) {
             die('Erreur: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get forums for a specific course with access control
+     * @param int $courseId Course ID
+     * @param int|null $userId User ID for access verification
+     * @return array Forums for the course
+     */
+    public function getForumsByCourse(int $courseId, ?int $userId = null): array
+    {
+        try {
+            // If user specified, verify access
+            if ($userId !== null && !$this->canAccessCourseForum($userId, $courseId)) {
+                return [];
+            }
+
+            $db = Config::getConnexion();
+            $stmt = $db->prepare("
+                SELECT f.*,
+                       COUNT(DISTINCT p.idPost) AS postCount,
+                       ROUND(AVG(fr.note), 1) AS avgRating,
+                       COUNT(DISTINCT fr.idRating) AS ratingCount,
+                       c.titre as courseTitre
+                FROM forum f
+                LEFT JOIN post p ON p.idForum = f.idForum
+                LEFT JOIN forum_rating fr ON fr.idForum = f.idForum
+                LEFT JOIN course c ON f.idCourse = c.idCourse
+                WHERE f.idCourse = :courseId
+                GROUP BY f.idForum
+                ORDER BY f.dateCreation DESC
+            ");
+            $stmt->execute([':courseId' => $courseId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error fetching forums by course: " . $e->getMessage());
+            return [];
         }
     }
 

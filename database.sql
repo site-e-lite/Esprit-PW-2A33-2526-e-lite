@@ -54,3 +54,53 @@ CREATE TABLE IF NOT EXISTS post (
     FOREIGN KEY (IdUser) REFERENCES user(idUser) ON DELETE CASCADE,
     FOREIGN KEY (IdForum) REFERENCES forum(IdForum) ON DELETE CASCADE
 );
+
+-- Teacher-Course Relationship Table
+CREATE TABLE IF NOT EXISTS teacher_course (
+    idTeacherCourse INT AUTO_INCREMENT PRIMARY KEY,
+    idUser INT NOT NULL,
+    idCourse INT NOT NULL,
+    dateAssigned DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (idUser) REFERENCES user(idUser) ON DELETE CASCADE,
+    FOREIGN KEY (idCourse) REFERENCES course(idCourse) ON DELETE CASCADE,
+    UNIQUE KEY unique_teacher_course (idUser, idCourse),
+    INDEX idx_teacher (idUser),
+    INDEX idx_course (idCourse)
+);
+
+-- Forum Rating Table
+CREATE TABLE IF NOT EXISTS forum_rating (
+    idRating INT AUTO_INCREMENT PRIMARY KEY,
+    IdForum INT NOT NULL,
+    IdUser INT NOT NULL,
+    note INT NOT NULL CHECK (note >= 1 AND note <= 5),
+    dateRating DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (IdForum) REFERENCES forum(IdForum) ON DELETE CASCADE,
+    FOREIGN KEY (IdUser) REFERENCES user(idUser) ON DELETE CASCADE,
+    UNIQUE KEY unique_forum_rating (IdForum, IdUser),
+    INDEX idx_forum_rating (IdForum)
+);
+
+-- Enrollment Table (if not already created separately)
+CREATE TABLE IF NOT EXISTS enrollment (
+    idEnrollment INT AUTO_INCREMENT PRIMARY KEY,
+    idUser INT NOT NULL,
+    idCourse INT NOT NULL,
+    niveauInitial VARCHAR(50) NOT NULL,
+    objectifPersonnel TEXT NULL,
+    engagement INT DEFAULT 5,
+    modeAcces VARCHAR(50) DEFAULT 'standard',
+    dateInscription DATETIME DEFAULT CURRENT_TIMESTAMP,
+    progression INT DEFAULT 0,
+    derniereActivite DATETIME NULL,
+    tempsTotalPasse INT DEFAULT 0,
+    statut VARCHAR(20) DEFAULT 'actif',
+    noteFinale DECIMAL(5,2) NULL,
+    certificatObtenu BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (idUser) REFERENCES user(idUser) ON DELETE CASCADE,
+    FOREIGN KEY (idCourse) REFERENCES course(idCourse) ON DELETE CASCADE,
+    UNIQUE KEY unique_enrollment (idUser, idCourse),
+    INDEX idx_student (idUser),
+    INDEX idx_course_enrollment (idCourse),
+    INDEX idx_statut (statut)
+);
