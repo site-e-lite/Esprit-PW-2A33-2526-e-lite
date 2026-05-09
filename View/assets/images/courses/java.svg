@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#0f3460"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="500" fill="url(#bg)"/>
+  <!-- Java cup shape -->
+  <rect x="310" y="130" width="280" height="240" rx="20" fill="#e76f00"/>
+  <rect x="330" y="150" width="240" height="200" rx="12" fill="#f89820"/>
+  <text x="360" y="250" font-family="serif" font-size="52" font-weight="bold" fill="#fff">Java</text>
+  <text x="345" y="300" font-family="sans-serif" font-size="18" fill="#fff" opacity="0.9">POO &amp; Collections</text>
+  <!-- Handle -->
+  <path d="M590 200 Q650 200 650 260 Q650 320 590 320" stroke="#e76f00" stroke-width="28" fill="none" stroke-linecap="round"/>
+  <!-- Decorative -->
+  <circle cx="100" cy="400" r="50" fill="#f89820" opacity="0.12"/>
+  <circle cx="800" cy="100" r="70" fill="#e76f00" opacity="0.1"/>
+</svg>
