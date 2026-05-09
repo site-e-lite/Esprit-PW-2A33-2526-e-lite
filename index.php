@@ -4,7 +4,8 @@
  * Sous-dossier XAMPP : les chemins de requête sont normalisés avec le dossier du script.
  */
 session_start();
-require_once __DIR__ . '/Controller/UserController.php';
+require_once __DIR__ . '/Controller/User/UserController.php';
+require_once __DIR__ . '/Controller/Forum/ForumController.php';
 
 $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
 $basePath     = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
@@ -32,7 +33,14 @@ switch ($request) {
         include __DIR__ . '/View/layout/footer.php';
         break;
     case '/forum':
-        require __DIR__ . '/View/FrontOffice/index.php';
+        require __DIR__ . '/View/Forum/FrontOffice/index.php';
+        break;
+    case '/forum/manage':
+        if (!isset($_SESSION['user_id'])) {
+            header('Location: ' . ($basePath === '' ? '' : $basePath) . '/login');
+            exit;
+        }
+        require __DIR__ . '/View/Forum/BackOffice/forum.php';
         break;
     case '/login':
         $controller->login();

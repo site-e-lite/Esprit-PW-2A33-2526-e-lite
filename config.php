@@ -43,14 +43,14 @@ class Config
         $email = 'forum-demo@e-lite.local';
         try {
             $stmt = $db->prepare(
-                'INSERT INTO user (nom, prenom, email, motDePasse, role) VALUES (?, ?, ?, ?, ?)'
+                'INSERT INTO user (nom, prenom, email, motDePasse, idRole) VALUES (?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 'Forum',
                 'Visiteur',
                 $email,
                 password_hash('demo', PASSWORD_DEFAULT),
-                'etudiant',
+                2,
             ]);
             return (int) $db->lastInsertId();
         } catch (PDOException $e) {

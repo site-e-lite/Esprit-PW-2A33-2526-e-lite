@@ -15,8 +15,8 @@ try {
     $stmt = $db->query("SELECT COUNT(*) FROM user WHERE idUser = 8");
     if ($stmt->fetchColumn() == 0) {
         $db->exec("
-            INSERT INTO user (idUser, nom, prenom, email, motDePasse, role, telephone, dateNaissance, photo, statut)
-            VALUES (8, 'Dupont', 'Jean', 'jean.dupont@example.com', '".md5('password123')."', 'etudiant', '+33612345678', '1995-05-15', 'https://ui-avatars.com/api/?name=Jean+Dupont', 'actif')
+            INSERT INTO user (idUser, nom, prenom, email, motDePasse, idRole, telephone, dateNaissance, photo, statut)
+            VALUES (8, 'Dupont', 'Jean', 'jean.dupont@example.com', '".md5('password123')."', 2, '+33612345678', '1995-05-15', 'https://ui-avatars.com/api/?name=Jean+Dupont', 'actif')
         ");
         echo "<p>✓ User #8 created</p>";
     } else {
