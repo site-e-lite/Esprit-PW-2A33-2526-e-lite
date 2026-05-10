@@ -21,8 +21,8 @@ $data = [
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $data   = array_merge($data, $_POST);
-    $result = $controller->add($data);
+    $data    = array_merge($data, $_POST);
+    $result  = $controller->add($data);
     $message = $result['message'];
     $errors  = $result['errors'];
 
@@ -36,34 +36,24 @@ require_once __DIR__ . '/../../includes/header.php';
 ?>
 
 <style>
-.erreur-js {
-    display: none;
-    color: #d32f2f;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-}
-.erreur-js.erreur {
-    display: block;
-}
-input.erreur, textarea.erreur, select.erreur {
-    border-color: #d32f2f;
-    background-color: #ffebee;
-}
-input.valide, textarea.valide, select.valide {
-    border-color: #388e3c;
-    background-color: #f1f8e9;
-}
+.erreur-js          { display:none; color:#d32f2f; font-size:.82rem; margin-top:.25rem; }
+.erreur-js.visible  { display:block; }
+input.erreur, textarea.erreur, select.erreur { border-color:#d32f2f !important; }
+input.valide, textarea.valide, select.valide { border-color:#388e3c !important; }
 </style>
 
 <section>
     <h2>Ajouter un cours</h2>
     <p><a href="<?= $baseUrl ?>/View/BackOffice/course/list.php">Retour à la liste</a></p>
-    <?php if ($message !== ''): ?><p><?= htmlspecialchars($message) ?></p><?php endif; ?>
+    <?php if ($message !== ''): ?>
+        <p><?= htmlspecialchars($message) ?></p>
+    <?php endif; ?>
 
     <form method="post" id="courseForm" novalidate>
 
         <label for="titre">Titre</label><br>
-        <input type="text" id="titre" name="titre" value="<?= htmlspecialchars((string)$data['titre']) ?>"><br>
+        <input type="text" id="titre" name="titre"
+               value="<?= htmlspecialchars((string)$data['titre']) ?>"><br>
         <small id="titreErreur" class="erreur-js"></small><br>
 
         <label for="description">Description</label><br>
@@ -79,7 +69,8 @@ input.valide, textarea.valide, select.valide {
         <small id="niveauErreur" class="erreur-js"></small><br>
 
         <label for="duree">Durée (heures)</label><br>
-        <input type="text" id="duree" name="duree" value="<?= htmlspecialchars((string)$data['duree']) ?>"><br>
+        <input type="text" id="duree" name="duree"
+               value="<?= htmlspecialchars((string)$data['duree']) ?>"><br>
         <small id="dureeErreur" class="erreur-js"></small><br>
 
         <label for="statut">Statut</label><br>
@@ -88,248 +79,144 @@ input.valide, textarea.valide, select.valide {
             <option value="publie"    <?= $data['statut'] === 'publie'    ? 'selected' : '' ?>>Publié</option>
             <option value="archive"   <?= $data['statut'] === 'archive'   ? 'selected' : '' ?>>Archivé</option>
         </select><br>
-        <small id="statutErreur" class="erreur-js"></small><br>
 
         <label for="langue">Langue</label><br>
-        <input type="text" id="langue" name="langue" value="<?= htmlspecialchars((string)$data['langue']) ?>"><br>
+        <input type="text" id="langue" name="langue"
+               value="<?= htmlspecialchars((string)$data['langue']) ?>"><br>
         <small id="langueErreur" class="erreur-js"></small><br>
 
         <label for="prix">Prix (TND)</label><br>
-        <input type="text" id="prix" name="prix" value="<?= htmlspecialchars((string)$data['prix']) ?>"><br>
+        <input type="text" id="prix" name="prix"
+               value="<?= htmlspecialchars((string)$data['prix']) ?>"><br>
         <small id="prixErreur" class="erreur-js"></small><br>
 
         <label for="image">Image (URL — optionnel)</label><br>
-        <input type="text" id="image" name="image" value="<?= htmlspecialchars((string)$data['image']) ?>"><br>
+        <input type="text" id="image" name="image"
+               value="<?= htmlspecialchars((string)$data['image']) ?>"><br>
         <small id="imageErreur" class="erreur-js"></small><br>
 
         <label for="objectifs">Objectifs</label><br>
         <textarea id="objectifs" name="objectifs"><?= htmlspecialchars((string)$data['objectifs']) ?></textarea><br>
-        <small id="objectifsErreur" class="erreur-js"></small><br>
 
         <label for="prerequis">Prérequis</label><br>
-        <textarea id="prerequis" name="prerequis"><?= htmlspecialchars((string)$data['prerequis']) ?></textarea><br>
-        <small id="prerequisErreur" class="erreur-js"></small><br><br>
+        <textarea id="prerequis" name="prerequis"><?= htmlspecialchars((string)$data['prerequis']) ?></textarea><br><br>
 
         <button type="submit">Enregistrer</button>
     </form>
 </section>
 
 <script>
-function afficherErreur(fieldId, message) {
-    const field = document.getElementById(fieldId);
-    const errorContainer = document.getElementById(fieldId + 'Erreur');
-    
-    if (message) {
+// ── Helpers ──────────────────────────────────────────────────────
+function afficherErreur(id, msg) {
+    var field = document.getElementById(id);
+    var span  = document.getElementById(id + 'Erreur');
+    if (!field) return;
+    if (msg) {
         field.classList.add('erreur');
         field.classList.remove('valide');
-        errorContainer.textContent = message;
-        errorContainer.classList.add('erreur');
+        if (span) { span.textContent = msg; span.classList.add('visible'); }
     } else {
         field.classList.remove('erreur');
         field.classList.add('valide');
-        errorContainer.textContent = '';
-        errorContainer.classList.remove('erreur');
+        if (span) { span.textContent = ''; span.classList.remove('visible'); }
     }
 }
 
-function validerFormulaireComplet() {
-    const titre = document.getElementById('titre').value.trim();
-    const description = document.getElementById('description').value.trim();
-    const duree = document.getElementById('duree').value.trim();
-    const langue = document.getElementById('langue').value.trim();
-    const prix = document.getElementById('prix').value.trim();
-    const image = document.getElementById('image').value.trim();
-    
-    let isValid = true;
-    
-    if (!titre || titre.length === 0) {
-        afficherErreur('titre', 'Le titre est requis.');
-        isValid = false;
-    } else if (titre.length < 3) {
-        afficherErreur('titre', 'Le titre doit contenir au moins 3 caractères.');
-        isValid = false;
-    } else {
-        afficherErreur('titre', '');
-    }
-    
-    if (!description || description.length === 0) {
-        afficherErreur('description', 'La description est requise.');
-        isValid = false;
-    } else if (description.length < 10) {
-        afficherErreur('description', 'La description doit contenir au moins 10 caractères.');
-        isValid = false;
-    } else {
-        afficherErreur('description', '');
-    }
-    
-    if (!duree || duree.length === 0) {
-        afficherErreur('duree', 'La durée est requise.');
-        isValid = false;
-    } else if (isNaN(duree) || duree <= 0 || duree > 500) {
-        afficherErreur('duree', 'La durée doit être entre 1 et 500 heures.');
-        isValid = false;
-    } else {
-        afficherErreur('duree', '');
-    }
-    
-    if (!langue || langue.length === 0) {
-        afficherErreur('langue', 'La langue est requise.');
-        isValid = false;
-    } else {
-        afficherErreur('langue', '');
-    }
-    
-    if (!prix || prix.length === 0) {
-        afficherErreur('prix', 'Le prix est requis.');
-        isValid = false;
-    } else if (isNaN(prix) || prix < 0 || prix > 9999.99) {
-        afficherErreur('prix', 'Le prix doit être entre 0 et 9999.99.');
-        isValid = false;
-    } else if (!/^\d+(\.\d{1,2})?$/.test(prix)) {
-        afficherErreur('prix', 'Le prix ne peut avoir plus de 2 décimales.');
-        isValid = false;
-    } else {
-        afficherErreur('prix', '');
-    }
-    
-    if (image && image.length > 0) {
-        try {
-            new URL(image);
-            afficherErreur('image', '');
-        } catch (e) {
-            afficherErreur('image', 'L\'URL de l\'image n\'est pas valide.');
-            isValid = false;
-        }
-    } else {
-        afficherErreur('image', '');
-    }
-    
-    return isValid;
+// ── Règles de validation ─────────────────────────────────────────
+function regleTitre(v) {
+    v = v.trim();
+    if (!v)         return 'Le titre est obligatoire.';
+    if (v.length<3) return 'Le titre doit contenir au moins 3 caractères.';
+    if (v.length>100) return 'Le titre ne doit pas dépasser 100 caractères.';
+    return '';
+}
+function regleDescription(v) {
+    v = v.trim();
+    if (!v)          return 'La description est obligatoire.';
+    if (v.length<20) return 'La description doit contenir au moins 20 caractères.';
+    return '';
+}
+function regleDuree(v) {
+    v = v.trim();
+    if (!v)                    return 'La durée est obligatoire.';
+    if (!/^\d+$/.test(v))      return 'La durée doit être un nombre entier.';
+    var n = parseInt(v, 10);
+    if (n < 1)   return 'La durée doit être au moins 1 heure.';
+    if (n > 500) return 'La durée ne peut pas dépasser 500 heures.';
+    return '';
+}
+function reglePrix(v) {
+    v = v.trim();
+    if (!v)           return 'Le prix est obligatoire.';
+    if (isNaN(v))     return 'Le prix doit être un nombre.';
+    var n = parseFloat(v);
+    if (n < 0)        return 'Le prix ne peut pas être négatif.';
+    if (n > 9999.99)  return 'Le prix ne peut pas dépasser 9999.99 TND.';
+    return '';
+}
+function regleLangue(v) {
+    v = v.trim();
+    if (!v)                          return 'La langue est obligatoire.';
+    if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(v)) return 'La langue ne doit contenir que des lettres.';
+    return '';
+}
+function regleNiveau(v) {
+    if (['debutant','intermediaire','avance'].indexOf(v) === -1)
+        return 'Veuillez choisir un niveau valide.';
+    return '';
+}
+function regleImage(v) {
+    v = v.trim();
+    if (!v) return '';
+    if (!/^https?:\/\/.+/.test(v)) return "L'URL doit commencer par http:// ou https://";
+    return '';
 }
 
-function validerFormulaireEtSoumettre(event) {
-    event.preventDefault();
-    
-    if (validerFormulaireComplet()) {
-        document.getElementById('courseForm').submit();
-    }
+// ── Map champ → règle ────────────────────────────────────────────
+var regles = {
+    titre:       regleTitre,
+    description: regleDescription,
+    duree:       regleDuree,
+    prix:        reglePrix,
+    langue:      regleLangue,
+    niveau:      regleNiveau,
+    image:       regleImage
+};
+
+// ── Validation complète ──────────────────────────────────────────
+function validerTout() {
+    var ok = true;
+    Object.keys(regles).forEach(function(id) {
+        var field = document.getElementById(id);
+        if (!field) return;
+        var msg = regles[id](field.value);
+        afficherErreur(id, msg);
+        if (msg) ok = false;
+    });
+    return ok;
 }
 
+// ── Validation en temps réel ─────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('courseForm');
-    
-    const titre = document.getElementById('titre');
-    titre.addEventListener('input', function() {
-        const value = this.value.trim();
-        if (value.length === 0) {
-            afficherErreur('titre', 'Le titre est requis.');
-        } else if (value.length < 3) {
-            afficherErreur('titre', 'Le titre doit contenir au moins 3 caractères.');
-        } else {
-            afficherErreur('titre', '');
+    Object.keys(regles).forEach(function(id) {
+        var field = document.getElementById(id);
+        if (!field) return;
+        field.addEventListener('input', function() {
+            afficherErreur(id, regles[id](field.value));
+        });
+        field.addEventListener('blur', function() {
+            afficherErreur(id, regles[id](field.value));
+        });
+    });
+
+    // ── Submit ───────────────────────────────────────────────────
+    document.getElementById('courseForm').addEventListener('submit', function(e) {
+        if (!validerTout()) {
+            e.preventDefault();
+            var first = document.querySelector('input.erreur, textarea.erreur, select.erreur');
+            if (first) { first.scrollIntoView({behavior:'smooth', block:'center'}); first.focus(); }
         }
     });
-    titre.addEventListener('blur', function() {
-        if (this.value.trim().length === 0) {
-            afficherErreur('titre', 'Le titre est requis.');
-        }
-    });
-    
-    const description = document.getElementById('description');
-    description.addEventListener('input', function() {
-        const value = this.value.trim();
-        if (value.length === 0) {
-            afficherErreur('description', 'La description est requise.');
-        } else if (value.length < 10) {
-            afficherErreur('description', 'La description doit contenir au moins 10 caractères.');
-        } else {
-            afficherErreur('description', '');
-        }
-    });
-    description.addEventListener('blur', function() {
-        if (this.value.trim().length === 0) {
-            afficherErreur('description', 'La description est requise.');
-        }
-    });
-    
-    const duree = document.getElementById('duree');
-    duree.addEventListener('input', function() {
-        const value = this.value.trim();
-        if (value.length === 0) {
-            afficherErreur('duree', 'La durée est requise.');
-        } else if (isNaN(value) || value <= 0 || value > 500) {
-            afficherErreur('duree', 'La durée doit être entre 1 et 500 heures.');
-        } else {
-            afficherErreur('duree', '');
-        }
-    });
-    duree.addEventListener('blur', function() {
-        if (this.value.trim().length === 0) {
-            afficherErreur('duree', 'La durée est requise.');
-        }
-    });
-    
-    const langue = document.getElementById('langue');
-    langue.addEventListener('input', function() {
-        const value = this.value.trim();
-        if (value.length === 0) {
-            afficherErreur('langue', 'La langue est requise.');
-        } else {
-            afficherErreur('langue', '');
-        }
-    });
-    langue.addEventListener('blur', function() {
-        if (this.value.trim().length === 0) {
-            afficherErreur('langue', 'La langue est requise.');
-        }
-    });
-    
-    const prix = document.getElementById('prix');
-    prix.addEventListener('input', function() {
-        const value = this.value.trim();
-        if (value.length === 0) {
-            afficherErreur('prix', 'Le prix est requis.');
-        } else if (isNaN(value) || value < 0 || value > 9999.99) {
-            afficherErreur('prix', 'Le prix doit être entre 0 et 9999.99.');
-        } else if (!/^\d+(\.\d{1,2})?$/.test(value)) {
-            afficherErreur('prix', 'Le prix ne peut avoir plus de 2 décimales.');
-        } else {
-            afficherErreur('prix', '');
-        }
-    });
-    prix.addEventListener('blur', function() {
-        if (this.value.trim().length === 0) {
-            afficherErreur('prix', 'Le prix est requis.');
-        }
-    });
-    
-    const image = document.getElementById('image');
-    image.addEventListener('input', function() {
-        const value = this.value.trim();
-        if (value.length === 0) {
-            afficherErreur('image', '');
-        } else {
-            try {
-                new URL(value);
-                afficherErreur('image', '');
-            } catch (e) {
-                afficherErreur('image', 'L\'URL de l\'image n\'est pas valide.');
-            }
-        }
-    });
-    image.addEventListener('blur', function() {
-        const value = this.value.trim();
-        if (value.length > 0) {
-            try {
-                new URL(value);
-                afficherErreur('image', '');
-            } catch (e) {
-                afficherErreur('image', 'L\'URL de l\'image n\'est pas valide.');
-            }
-        }
-    });
-    
-    form.addEventListener('submit', validerFormulaireEtSoumettre);
 });
 </script>
 

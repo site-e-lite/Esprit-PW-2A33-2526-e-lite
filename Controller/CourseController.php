@@ -196,11 +196,27 @@ class CourseController
         ]);
 
         if ($result) {
-            $courseId = $this->db->lastInsertId();
-            
+            $courseId = (int)$this->db->lastInsertId();
+
             // Assign course to teacher if they created it (not admin)
             if (PermissionHelper::isTeacher($userId)) {
                 PermissionHelper::assignTeacherToCourse($userId, $courseId);
+            }
+
+            // Auto-create a forum for this course
+            try {
+                $forumStmt = $this->db->prepare(
+                    'INSERT INTO forum (titre, description, idCourse)
+                     VALUES (:titre, :description, :idCourse)'
+                );
+                $forumStmt->execute([
+                    'titre'       => 'Forum — ' . trim((string)$data['titre']),
+                    'description' => 'Espace de discussion pour le cours : ' . trim((string)$data['titre']),
+                    'idCourse'    => $courseId,
+                ]);
+            } catch (Exception $e) {
+                // Forum creation failure is non-fatal
+                error_log('CourseController::add — forum auto-create failed: ' . $e->getMessage());
             }
 
             return ['success' => true, 'errors' => [], 'message' => 'Cours ajouté avec succès.'];

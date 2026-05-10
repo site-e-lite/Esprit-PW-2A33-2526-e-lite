@@ -1,105 +1,56 @@
 <?php
+/**
+ * Forum List - View/Forum/FrontOffice/index.php
+ * Displays forums accessible to the current user
+ * Filters by course enrollment and user role
+ */
+
+session_start();
+
+require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../Utils/PermissionHelper.php';
+require_once __DIR__ . '/../../../Model/Forum/Forum.php';
 require_once __DIR__ . '/../../../Controller/Forum/ForumController.php';
-require_once __DIR__ . '/../../../Controller/Forum/PostController.php';
 
-/** Chemin de cette page (sans query) — évite de poster vers /index.php racine qui perd le POST (redirect 302). */
-$frontBasePath = strtok($_SERVER['REQUEST_URI'] ?? '/', '?') ?: '/';
-$scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-$basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
-if ($basePath === '.' || $basePath === '/') {
-    $basePath = '';
+$userId = $_SESSION['user_id'] ?? 0;
+$isLoggedIn = $userId > 0;
+
+$db = Config::getInstance()->getConnexion();
+
+// Determine base path
+$_projectRoot = realpath(__DIR__ . '/../../../..');
+$_docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
+$_rel = str_replace('\\', '/', substr($_projectRoot, strlen($_docRoot)));
+$basePath = rtrim($_rel, '/');
+if ($basePath === '.' || $basePath === '') $basePath = '';
+
+// Get forums accessible to user
+if ($isLoggedIn) {
+    $forums = PermissionHelper::getAccessibleForums($userId);
+} else {
+    $forums = [];
 }
-$forumAssetsBase = $basePath . '/View/assets/Forum';
-$isLoggedIn = isset($_SESSION['user_id']);
-$roleName = strtolower(trim((string)($_SESSION['role_nom'] ?? '')));
-$isAdminOrFormateur = in_array($roleName, ['admin', 'administrateur', 'formateur', 'teacher', 'instructor'], true)
-    || (int)($_SESSION['user_role'] ?? 0) === 1;
 
-$forumController = new ForumController();
-$postController = new PostController();
-$frontOfficeUserId = Config::getOrCreateFrontOfficeUserId();
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_POST['action']) && $_POST['action'] === 'rate_forum') {
-        $idForum = intval($_POST['idForum']  ?? 0);
-        $note    = intval($_POST['note']     ?? 0);
-        $idUser  = intval($_POST['idUser']   ?? $frontOfficeUserId);
-        if ($idForum > 0 && $note >= 1 && $note <= 5) {
-            $newAvg = $forumController->raterForum($idForum, $note, $idUser);
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'avg' => $newAvg]);
-        } else {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false]);
-        }
-        exit;
+// Get average ratings for forums
+$forumRatings = [];
+if (!empty($forums)) {
+    $forumIds = array_column($forums, 'idForum');
+    $placeholders = implode(',', array_fill(0, count($forumIds), '?'));
+    $stmt = $db->prepare("
+        SELECT idForum, AVG(note) as avgNote, COUNT(*) as ratingCount
+        FROM forum_rating
+        WHERE idForum IN ($placeholders)
+        GROUP BY idForum
+    ");
+    $stmt->execute($forumIds);
+    $ratings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($ratings as $rating) {
+        $forumRatings[$rating['idForum']] = $rating;
     }
+}
 
-    if (isset($_POST['action']) && $_POST['action'] === 'rate_post') {
-        $idP   = intval($_POST['idPost'] ?? 0);
-        $note  = intval($_POST['note']   ?? 0);
-        if ($idP > 0 && $note >= 1 && $note <= 5) {
-            $success = $postController->raterPost($idP, $note);
-            header('Content-Type: application/json');
-            echo json_encode(['success' => $success]);
-        } else {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false]);
-        }
-        exit;
-    }
-
-    if (isset($_POST['action']) && $_POST['action'] === 'chatbot_query') {
-        require_once __DIR__ . '/../../../Controller/Forum/ChatbotController.php';
-        $chatbot = new ChatbotController();
-        $res = $chatbot->handleRequest($_POST['query'] ?? '');
-        header('Content-Type: application/json');
-        echo json_encode($res);
-        exit;
-    }
-    if (isset($_POST['action']) && $_POST['action'] === 'chatbot_summarize') {
-        require_once __DIR__ . '/../../../Controller/Forum/ChatbotController.php';
-        $chatbot = new ChatbotController();
-        $s = $chatbot->summarizeThread($_POST['idForum'] ?? 0);
-        header('Content-Type: application/json');
-        echo json_encode(['summary' => $s]);
-        exit;
-    }
-
-    if (isset($_POST['action']) && $_POST['action'] == 'add_forum') {
-        require_once __DIR__ . '/../../../Controller/Forum/ChatbotController.php';
-        $chatbot = new ChatbotController();
-        
-        $combinedText = $_POST['titre'] . " " . $_POST['description'];
-        $evaluation = $chatbot->evaluateContentRisk($combinedText);
-        
-        if ($evaluation['risk'] === 'High') {
-            $errorMsg = urlencode("Risque élevé : " . $evaluation['reason']);
-            header('Location: ' . $frontBasePath . '?error=toxic&msg=' . $errorMsg . '#forum');
-            exit;
-        }
-
-        $forum = new Forum($_POST['titre'], $_POST['description'], $_POST['idCourse'] ?? 0);
-        if (!$forumController->addForum($forum)) {
-            header('Location: ' . $frontBasePath . '?error=no_course&msg=' . urlencode('Aucun cours en base : ajoute au moins un cours (back-office ou SQL) avant de créer un forum. ID cours 0 = premier cours disponible.') . '#forum');
-            exit;
-        }
-        header('Location: ' . $frontBasePath . '#forum');
-        exit;
-    }
-    if (isset($_POST['action']) && $_POST['action'] == 'add_post') {
-        require_once __DIR__ . '/../../../Controller/Forum/ChatbotController.php';
-        $chatbot = new ChatbotController();
-        
-        $evaluation = $chatbot->evaluateContentRisk($_POST['contenu']);
-        
-        if ($evaluation['risk'] === 'High') {
-            $errorMsg = urlencode("Risque élevé : " . $evaluation['reason']);
-            header('Location: ' . $frontBasePath . '?error=toxic&msg=' . $errorMsg . '#forum');
-            exit;
-        }
-
-        $idF = max(1, (int) ($_POST['idForum'] ?? 1));
+$pageTitle = 'Forums - e-lite';
+$idF = max(1, (int) ($_POST['idForum'] ?? 1));
         $post = new Post(trim((string) ($_POST['contenu'] ?? '')), $frontOfficeUserId, $idF, '');
         if (!$postController->addPost($post)) {
             header('Location: ' . $frontBasePath . '?error=post&msg=' . urlencode("Enregistrement impossible (utilisateur ou forum invalide). Réessayez.") . '#forum');

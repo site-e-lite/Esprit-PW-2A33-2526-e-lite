@@ -41,7 +41,7 @@ class ForumController {
     public function canPostInForum(int $userId, int $forumId): bool
     {
         try {
-            $db = Config::getConnexion();
+            $db = Config::getInstance()->getConnexion();
             $stmt = $db->prepare("SELECT idCourse FROM forum WHERE idForum = :id");
             $stmt->execute([':id' => $forumId]);
             $courseId = $stmt->fetchColumn();
@@ -65,7 +65,7 @@ class ForumController {
     public function getAccessibleForums(int $userId): array
     {
         try {
-            $db = Config::getConnexion();
+            $db = Config::getInstance()->getConnexion();
             
             // Admins see all forums
             if (PermissionHelper::isAdmin($userId)) {
@@ -131,7 +131,7 @@ class ForumController {
 
     /** Afficher tous les forums (avec filtrage optionnel) */
     public function afficherForums($filters = []) {
-        $db     = Config::getConnexion();
+        $db     = Config::getInstance()->getConnexion();
         $where  = [];
         $params = [];
 
@@ -195,7 +195,7 @@ class ForumController {
                 return [];
             }
 
-            $db = Config::getConnexion();
+            $db = Config::getInstance()->getConnexion();
             $stmt = $db->prepare("
                 SELECT f.*,
                        COUNT(DISTINCT p.idPost) AS postCount,
@@ -223,7 +223,7 @@ class ForumController {
      */
     private function resolveForumCourseId($rawIdCourse): ?int {
         $id = (int) $rawIdCourse;
-        $db = Config::getConnexion();
+        $db = Config::getInstance()->getConnexion();
         if ($id > 0) {
             $s = $db->prepare('SELECT idCourse FROM course WHERE idCourse = ?');
             $s->execute([$id]);
@@ -243,7 +243,7 @@ class ForumController {
         }
         $sql = 'INSERT INTO forum (titre, description, idCourse)
                 VALUES (:titre, :description, :idCourse)';
-        $db = Config::getConnexion();
+        $db = Config::getInstance()->getConnexion();
         try {
             $query = $db->prepare($sql);
             return $query->execute([
@@ -260,7 +260,7 @@ class ForumController {
     /** Modifier un forum */
     public function updateForum($forum, $id) {
         try {
-            $db    = Config::getConnexion();
+            $db    = Config::getInstance()->getConnexion();
             $query = $db->prepare(
                 'UPDATE forum SET
                     titre       = :titre,
@@ -286,7 +286,7 @@ class ForumController {
     /** Supprimer un forum */
     public function deleteForum($id) {
         $sql = "DELETE FROM forum WHERE idForum = :id";
-        $db  = Config::getConnexion();
+        $db  = Config::getInstance()->getConnexion();
         $req = $db->prepare($sql);
         $req->bindValue(':id', $id);
         try {
@@ -299,7 +299,7 @@ class ForumController {
     /** Récupérer un forum par son ID */
     public function getForumById($id) {
         $sql = "SELECT * FROM forum WHERE idForum = :id";
-        $db  = Config::getConnexion();
+        $db  = Config::getInstance()->getConnexion();
         try {
             $query = $db->prepare($sql);
             $query->execute(['id' => $id]);
@@ -315,7 +315,7 @@ class ForumController {
 
     /** Retourne les statistiques globales du module forum */
     public function getStats() {
-        $db = Config::getConnexion();
+        $db = Config::getInstance()->getConnexion();
         try {
             $stats = [];
 
@@ -381,7 +381,7 @@ class ForumController {
 
     
     public function raterForum($idForum, $note, $idUser = 1) {
-        $db  = Config::getConnexion();
+        $db  = Config::getInstance()->getConnexion();
         $sql = "INSERT INTO forum_rating (idForum, idUser, note)
                 VALUES (:idForum, :idUser, :note)
                 ON DUPLICATE KEY UPDATE note = :note2, dateRating = NOW()";

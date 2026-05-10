@@ -4,6 +4,9 @@ require_once __DIR__ . '/../../../Controller/SupportCourseController.php';
 require_once __DIR__ . '/../../../Controller/ProgressController.php';
 require_once __DIR__ . '/../../../Controller/RatingController.php';
 require_once __DIR__ . '/../../../Controller/CertificateController.php';
+require_once __DIR__ . '/../../../Utils/PermissionHelper.php';
+
+if (session_status() === PHP_SESSION_NONE) session_start();
 
 $baseUrl = '/gestioncours';
 $courseController   = new CourseController();
@@ -12,8 +15,8 @@ $progressController = new ProgressController();
 $ratingController   = new RatingController();
 $certController     = new CertificateController();
 
-// --- Simulation utilisateur connecté (remplacer par session réelle plus tard) ---
-$currentUserId = 1;
+// Use real session user; fall back to 1 only if no session (dev mode)
+$currentUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 1;
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $course = $courseController->getById($id);
@@ -47,6 +50,30 @@ $completedIds    = $progressData['completed_ids'];
 
 // 3. Récupère le certificat existant (pour afficher le lien même sans action POST)
 $existingCert = $certController->getByUserAndCourse($currentUserId, $id);
+
+// --- Forum integration ---
+// Find the forum linked to this course (if any)
+$db = Config::getInstance()->getConnexion();
+$forumStmt = $db->prepare(
+    'SELECT f.idForum, f.titre,
+            COUNT(DISTINCT p.idPost) AS postCount,
+            ROUND(AVG(fr.note), 1)   AS avgRating
+     FROM forum f
+     LEFT JOIN post p ON p.idForum = f.idForum
+     LEFT JOIN forum_rating fr ON fr.idForum = f.idForum
+     WHERE f.idCourse = :courseId
+     GROUP BY f.idForum
+     LIMIT 1'
+);
+$forumStmt->execute([':courseId' => $id]);
+$courseForumData = $forumStmt->fetch();
+
+// Can the current user access the forum?
+$canAccessForum = false;
+if ($courseForumData) {
+    $canAccessForum = PermissionHelper::canPostInForum($currentUserId, (int)$courseForumData['idForum'])
+                   || PermissionHelper::isAdmin($currentUserId);
+}
 
 // --- Rating System ---
 // 1. Traitement du formulaire de notation
@@ -92,6 +119,39 @@ require_once __DIR__ . '/../../includes/header.php';
         |
         <a href="<?= $baseUrl ?>/View/FrontOffice/course/index.php">Retour</a>
     </p>
+
+    <!-- ===== FORUM BLOCK ===== -->
+    <?php if ($courseForumData): ?>
+        <div class="glass-card" style="margin-top:1.5rem; padding:1.2rem 1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <i class="fas fa-comments" style="font-size:1.6rem; color:#a78bfa;"></i>
+                <div>
+                    <p style="margin:0; font-weight:700; color:#f4f4f5;">
+                        <?= htmlspecialchars($courseForumData['titre']) ?>
+                    </p>
+                    <p style="margin:.2rem 0 0; font-size:.85rem; color:#aaa;">
+                        <?= (int)$courseForumData['postCount'] ?> message<?= $courseForumData['postCount'] != 1 ? 's' : '' ?>
+                        <?php if ($courseForumData['avgRating']): ?>
+                            &nbsp;·&nbsp;
+                            <i class="fas fa-star" style="color:#f59e0b;"></i>
+                            <?= $courseForumData['avgRating'] ?>/5
+                        <?php endif; ?>
+                    </p>
+                </div>
+            </div>
+            <?php if ($canAccessForum): ?>
+                <a href="<?= $baseUrl ?>/View/Forum/FrontOffice/index.php?forumId=<?= (int)$courseForumData['idForum'] ?>"
+                   class="btn-primary" style="white-space:nowrap;">
+                    <i class="fas fa-comments"></i> Accéder au Forum
+                </a>
+            <?php else: ?>
+                <span style="color:#6b7280; font-size:.88rem; font-style:italic;">
+                    Inscrivez-vous au cours pour accéder au forum.
+                </span>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+    <!-- ===== FIN FORUM BLOCK ===== -->
 
     <!-- ===== PROGRESS TRACKING ===== -->
     <div class="progress-block glass-card" style="margin-top:2rem; padding:1.5rem;">

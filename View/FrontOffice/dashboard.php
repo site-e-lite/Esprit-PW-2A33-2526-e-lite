@@ -1,615 +1,432 @@
 <?php
 /**
- * Integrated Dashboard - Shows statistics from Users, Courses, and Forums modules
- * Includes role-based views: Student, Teacher, and Admin dashboards
+ * View/FrontOffice/dashboard.php
+ * Role-based unified dashboard: Student / Teacher / Admin
  */
+if (session_status() === PHP_SESSION_NONE) session_start();
 
-session_start();
-require_once __DIR__ . '/../../../config.php';
-require_once __DIR__ . '/../../../Utils/DashboardHelper.php';
-require_once __DIR__ . '/../../../Utils/PermissionHelper.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../Utils/PermissionHelper.php';
 
-// Check if user is authenticated
+// Auth guard
 if (!isset($_SESSION['user_id'])) {
-    header('Location: /gestioncours/View/User/auth/login.php');
+    header('Location: /login');
     exit;
 }
 
-$userId = $_SESSION['user_id'];
-$dashboardData = DashboardHelper::getUserDashboard($userId);
-$userRole = $dashboardData['role'];
+$userId   = (int)$_SESSION['user_id'];
+$roleName = strtolower(trim((string)($_SESSION['role_nom'] ?? '')));
+$isAdmin   = ($roleName === 'admin');
+$isTeacher = ($roleName === 'enseignant');
+$isStudent = ($roleName === 'etudiant');
 
-include __DIR__ . '/../../includes/header.php';
+$db = Config::getInstance()->getConnexion();
+
+// ── Fetch data based on role ──────────────────────────────────────
+$data = [];
+
+if ($isStudent) {
+    // Enrolled courses with progress
+    $stmt = $db->prepare(
+        'SELECT e.*, c.titre, c.image, c.niveau, c.duree,
+                (SELECT COUNT(*) FROM lesson WHERE idCourse = c.idCourse) AS totalLessons,
+                (SELECT COUNT(*) FROM lesson_completion lc
+                 JOIN lesson l ON l.idLesson = lc.idLesson
+                 WHERE lc.user_id = :uid AND l.idCourse = c.idCourse) AS doneLessons
+         FROM enrollment e
+         JOIN course c ON c.idCourse = e.idCourse
+         WHERE e.idUser = :uid AND e.statut = "actif"
+         ORDER BY e.dateInscription DESC'
+    );
+    $stmt->execute([':uid' => $userId]);
+    $data['courses'] = $stmt->fetchAll();
+
+    // Certificates
+    $stmt2 = $db->prepare(
+        'SELECT cert.*, c.titre AS courseTitre
+         FROM certificates cert
+         JOIN course c ON c.idCourse = cert.course_id
+         WHERE cert.user_id = :uid
+         ORDER BY cert.date_obtained DESC LIMIT 5'
+    );
+    $stmt2->execute([':uid' => $userId]);
+    $data['certificates'] = $stmt2->fetchAll();
+
+    // Recent forum posts by this user
+    $stmt3 = $db->prepare(
+        'SELECT p.*, f.titre AS forumTitre, c.titre AS courseTitre
+         FROM post p
+         JOIN forum f ON f.idForum = p.idForum
+         LEFT JOIN course c ON c.idCourse = f.idCourse
+         WHERE p.idUser = :uid
+         ORDER BY p.datePost DESC LIMIT 5'
+    );
+    $stmt3->execute([':uid' => $userId]);
+    $data['recentPosts'] = $stmt3->fetchAll();
+
+} elseif ($isTeacher) {
+    // Courses taught
+    $teacherCourseIds = PermissionHelper::getTeacherCourses($userId);
+    $data['courses'] = [];
+
+    if (!empty($teacherCourseIds)) {
+        $placeholders = implode(',', array_fill(0, count($teacherCourseIds), '?'));
+        $stmt = $db->prepare(
+            "SELECT c.*,
+                    COUNT(DISTINCT e.idEnrollment) AS totalEnrolled,
+                    SUM(CASE WHEN e.statut='actif' THEN 1 ELSE 0 END) AS activeStudents,
+                    ROUND(AVG(e.progression),0) AS avgProgress,
+                    (SELECT COUNT(*) FROM forum WHERE idCourse = c.idCourse) AS forumCount
+             FROM course c
+             LEFT JOIN enrollment e ON e.idCourse = c.idCourse
+             WHERE c.idCourse IN ($placeholders)
+             GROUP BY c.idCourse
+             ORDER BY c.idCourse DESC"
+        );
+        $stmt->execute($teacherCourseIds);
+        $data['courses'] = $stmt->fetchAll();
+
+        // Recent enrollments in teacher's courses
+        $stmt2 = $db->prepare(
+            "SELECT e.*, u.nom, u.prenom, c.titre AS courseTitre
+             FROM enrollment e
+             JOIN user u ON u.idUser = e.idUser
+             JOIN course c ON c.idCourse = e.idCourse
+             WHERE e.idCourse IN ($placeholders)
+             ORDER BY e.dateInscription DESC LIMIT 10"
+        );
+        $stmt2->execute($teacherCourseIds);
+        $data['recentEnrollments'] = $stmt2->fetchAll();
+
+        // Recent forum posts in teacher's courses
+        $stmt3 = $db->prepare(
+            "SELECT p.*, f.titre AS forumTitre, c.titre AS courseTitre, u.nom, u.prenom
+             FROM post p
+             JOIN forum f ON f.idForum = p.idForum
+             JOIN course c ON c.idCourse = f.idCourse
+             JOIN user u ON u.idUser = p.idUser
+             WHERE f.idCourse IN ($placeholders)
+             ORDER BY p.datePost DESC LIMIT 8"
+        );
+        $stmt3->execute($teacherCourseIds);
+        $data['recentPosts'] = $stmt3->fetchAll();
+    }
+
+} elseif ($isAdmin) {
+    // Platform-wide stats
+    $data['stats'] = [
+        'totalUsers'       => $db->query("SELECT COUNT(*) FROM user WHERE statut='actif'")->fetchColumn(),
+        'totalStudents'    => $db->query("SELECT COUNT(u.idUser) FROM user u JOIN role r ON u.idRole=r.idRole WHERE r.nom='etudiant' AND u.statut='actif'")->fetchColumn(),
+        'totalTeachers'    => $db->query("SELECT COUNT(u.idUser) FROM user u JOIN role r ON u.idRole=r.idRole WHERE r.nom='enseignant' AND u.statut='actif'")->fetchColumn(),
+        'totalCourses'     => $db->query("SELECT COUNT(*) FROM course")->fetchColumn(),
+        'publishedCourses' => $db->query("SELECT COUNT(*) FROM course WHERE statut='publie'")->fetchColumn(),
+        'totalEnrollments' => $db->query("SELECT COUNT(*) FROM enrollment")->fetchColumn(),
+        'activeEnrollments'=> $db->query("SELECT COUNT(*) FROM enrollment WHERE statut='actif'")->fetchColumn(),
+        'certificates'     => $db->query("SELECT COUNT(*) FROM certificates")->fetchColumn(),
+        'totalForums'      => $db->query("SELECT COUNT(*) FROM forum")->fetchColumn(),
+        'totalPosts'       => $db->query("SELECT COUNT(*) FROM post")->fetchColumn(),
+    ];
+
+    // Top courses
+    $data['topCourses'] = $db->query(
+        "SELECT c.idCourse, c.titre, COUNT(e.idEnrollment) AS enrolled
+         FROM course c LEFT JOIN enrollment e ON e.idCourse = c.idCourse
+         GROUP BY c.idCourse ORDER BY enrolled DESC LIMIT 5"
+    )->fetchAll();
+
+    // Recent activity
+    $data['recentActivity'] = $db->query(
+        "SELECT 'enrollment' AS type, e.dateInscription AS date,
+                u.nom, u.prenom, c.titre AS label
+         FROM enrollment e
+         JOIN user u ON u.idUser = e.idUser
+         JOIN course c ON c.idCourse = e.idCourse
+         UNION ALL
+         SELECT 'post' AS type, p.datePost AS date,
+                u.nom, u.prenom, f.titre AS label
+         FROM post p
+         JOIN user u ON u.idUser = p.idUser
+         JOIN forum f ON f.idForum = p.idForum
+         ORDER BY date DESC LIMIT 12"
+    )->fetchAll();
+}
+
+$pageTitle = 'Dashboard — ' . ucfirst($roleName);
+require_once __DIR__ . '/../layout/header.php';
 ?>
 
-<div class="dashboard-container">
-    <div class="dashboard-header">
-        <h1>Dashboard - <?php echo ucfirst($userRole); ?></h1>
-        <p class="timestamp">Last updated: <?php echo $dashboardData['timestamp']; ?></p>
-    </div>
+<style>
+.dash-grid   { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:1.5rem; margin-top:1.5rem; }
+.dash-card   { background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:16px; padding:1.5rem; }
+.dash-card h2{ font-size:1.2rem; margin-bottom:1rem; color:#eab308; }
+.kpi-grid    { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+.kpi         { background:rgba(255,255,255,.04); border-radius:12px; padding:1rem; text-align:center; }
+.kpi .num    { font-size:2rem; font-weight:800; color:#f4f4f5; }
+.kpi .lbl    { font-size:.8rem; color:#aaa; margin-top:.2rem; }
+.course-row  { display:flex; align-items:center; gap:1rem; padding:.75rem 0; border-bottom:1px solid rgba(255,255,255,.06); }
+.course-row:last-child { border-bottom:none; }
+.course-thumb{ width:48px; height:48px; border-radius:8px; object-fit:cover; background:#1e1e2e; flex-shrink:0; }
+.course-info h4 { margin:0; font-size:.95rem; color:#f4f4f5; }
+.course-info small { color:#aaa; font-size:.8rem; }
+.prog-bar    { height:6px; background:#1e1e2e; border-radius:3px; margin-top:.4rem; overflow:hidden; }
+.prog-fill   { height:100%; background:linear-gradient(90deg,#7c3aed,#a78bfa); border-radius:3px; }
+.activity-item { padding:.6rem 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:.88rem; color:#d1d5db; }
+.activity-item:last-child { border-bottom:none; }
+.badge       { display:inline-block; padding:.2rem .6rem; border-radius:20px; font-size:.75rem; font-weight:600; }
+.badge-enroll{ background:rgba(16,185,129,.15); color:#4ade80; }
+.badge-post  { background:rgba(124,58,237,.15); color:#a78bfa; }
+.badge-cert  { background:rgba(234,179,8,.15); color:#fde047; }
+</style>
 
-    <?php if ($userRole === 'etudiant'): ?>
-        <!-- STUDENT DASHBOARD -->
-        <div class="dashboard-grid">
-            <!-- Courses Section -->
-            <section class="dashboard-section courses-section">
-                <h2>My Courses</h2>
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['courses']['total']; ?></h3>
-                        <p>Total Enrolled</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['courses']['active']; ?></h3>
-                        <p>Active Courses</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['courses']['completed']; ?></h3>
-                        <p>Completed</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['statistics']['certificatesEarned']; ?></h3>
-                        <p>Certificates</p>
-                    </div>
-                </div>
+<section>
+    <h1 style="font-size:2rem; margin-bottom:.5rem;">
+        Bonjour, <?= htmlspecialchars((string)($_SESSION['user_prenom'] ?? '')) ?> 👋
+    </h1>
+    <p style="color:#aaa;">
+        <?php
+        if ($isStudent)  echo 'Votre espace étudiant — suivez votre progression et participez aux forums.';
+        if ($isTeacher)  echo 'Votre espace enseignant — gérez vos cours et suivez vos étudiants.';
+        if ($isAdmin)    echo 'Tableau de bord administrateur — vue globale de la plateforme.';
+        ?>
+    </p>
 
-                <!-- Course Progress -->
-                <div class="course-progress-list">
-                    <?php foreach ($dashboardData['modules']['courses']['courses'] as $course): ?>
-                        <div class="course-item">
-                            <div class="course-header">
-                                <h4><?php echo htmlspecialchars($course['title']); ?></h4>
-                                <span class="status-badge <?php echo strtolower($course['status']); ?>">
-                                    <?php echo ucfirst($course['status']); ?>
-                                </span>
-                            </div>
-                            <div class="course-progress-bar">
-                                <div class="progress-fill" style="width: <?php echo $course['progress']; ?>%"></div>
-                            </div>
-                            <div class="course-meta">
-                                <span><?php echo $course['progress']; ?>% Complete</span>
-                                <span><?php echo $course['forums']; ?> Discussions • <?php echo $course['forumPosts']; ?> Posts</span>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
+    <?php /* ── STUDENT ─────────────────────────────────────────── */ ?>
+    <?php if ($isStudent): ?>
 
-            <!-- Forum Activity Section -->
-            <section class="dashboard-section forum-section">
-                <h2>Forum Activity</h2>
-                <div class="forum-stats">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['totalPosts']; ?></h3>
-                        <p>Your Posts</p>
-                    </div>
-                </div>
-
-                <h3>Recent Posts</h3>
-                <div class="forum-posts-list">
-                    <?php if (empty($dashboardData['modules']['forum']['recentActivity'])): ?>
-                        <p class="empty-state">No forum activity yet. Start a discussion!</p>
-                    <?php else: ?>
-                        <?php foreach ($dashboardData['modules']['forum']['recentActivity'] as $post): ?>
-                            <div class="forum-post-item">
-                                <h4><?php echo htmlspecialchars($post['forumTitle']); ?></h4>
-                                <p><?php echo substr(htmlspecialchars($post['contenu']), 0, 150) . '...'; ?></p>
-                                <small><?php echo date('M d, Y H:i', strtotime($post['datePost'])); ?></small>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </section>
-
-            <!-- Study Statistics -->
-            <section class="dashboard-section stats-section">
-                <h2>Study Statistics</h2>
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <h3><?php echo round($dashboardData['modules']['statistics']['avgCourseProgress']); ?>%</h3>
-                        <p>Average Progress</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo floor($dashboardData['modules']['statistics']['hoursStudied'] / 60); ?></h3>
-                        <p>Hours Studied</p>
-                    </div>
-                </div>
-            </section>
+        <div class="kpi-grid" style="margin-top:1.5rem;">
+            <div class="kpi">
+                <div class="num"><?= count($data['courses']) ?></div>
+                <div class="lbl">Cours actifs</div>
+            </div>
+            <div class="kpi">
+                <div class="num"><?= count($data['certificates']) ?></div>
+                <div class="lbl">Certificats</div>
+            </div>
+            <div class="kpi">
+                <div class="num"><?= count($data['recentPosts']) ?></div>
+                <div class="lbl">Posts forum</div>
+            </div>
         </div>
 
-    <?php elseif ($userRole === 'enseignant'): ?>
-        <!-- TEACHER DASHBOARD -->
-        <div class="dashboard-grid">
-            <!-- My Courses -->
-            <section class="dashboard-section courses-section">
-                <h2>My Courses</h2>
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['courses']['total']; ?></h3>
-                        <p>Total Courses</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['students']['active']; ?></h3>
-                        <p>Active Students</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['discussions']; ?></h3>
-                        <p>Forum Discussions</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['posts']; ?></h3>
-                        <p>Total Posts</p>
-                    </div>
-                </div>
-
-                <!-- Course List -->
-                <div class="course-management-list">
-                    <?php foreach ($dashboardData['modules']['courses']['courses'] as $course): ?>
-                        <div class="course-management-item">
-                            <h4><?php echo htmlspecialchars($course['titre']); ?></h4>
-                            <div class="course-stats">
-                                <span><?php echo $course['totalEnrolled']; ?> students</span>
-                                <span><?php echo $course['activeStudents']; ?> active</span>
-                                <span><?php echo round($course['avgProgress']); ?>% avg progress</span>
-                            </div>
-                            <div class="course-actions">
-                                <a href="/gestioncours/View/BackOffice/course/edit.php?id=<?php echo $course['idCourse']; ?>" class="btn-small">Edit</a>
-                                <a href="/gestioncours/View/Forum/FrontOffice/index.php?courseId=<?php echo $course['idCourse']; ?>" class="btn-small">Forum</a>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <!-- Students Overview -->
-            <section class="dashboard-section students-section">
-                <h2>Student Overview</h2>
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['students']['total']; ?></h3>
-                        <p>Total Students</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo round($dashboardData['modules']['statistics']['avgStudentProgress']); ?>%</h3>
-                        <p>Avg Progress</p>
-                    </div>
-                </div>
-
-                <h3>Top Students</h3>
-                <div class="students-list">
-                    <?php 
-                    $topStudents = array_slice($dashboardData['modules']['students']['list'], 0, 5);
-                    foreach ($topStudents as $student): 
+        <div class="dash-grid">
+            <div class="dash-card">
+                <h2><i class="fas fa-book-open"></i> Mes cours</h2>
+                <?php if (empty($data['courses'])): ?>
+                    <p style="color:#aaa;">Aucun cours en cours.
+                        <a href="/gestioncours/View/FrontOffice/course/index.php">Explorer les cours →</a>
+                    </p>
+                <?php else: ?>
+                    <?php foreach ($data['courses'] as $c):
+                        $total   = max(1, (int)$c['totalLessons']);
+                        $done    = (int)$c['doneLessons'];
+                        $pct     = min(100, (int)round($done / $total * 100));
                     ?>
-                        <div class="student-item">
-                            <div class="student-info">
-                                <span class="student-name"><?php echo htmlspecialchars($student['nom'] . ' ' . $student['prenom']); ?></span>
-                                <span class="student-email"><?php echo htmlspecialchars($student['email']); ?></span>
+                        <div class="course-row">
+                            <img class="course-thumb"
+                                 src="<?= htmlspecialchars((string)($c['image'] ?: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=100&q=60')) ?>"
+                                 alt="">
+                            <div class="course-info" style="flex:1;">
+                                <h4><?= htmlspecialchars($c['titre']) ?></h4>
+                                <small><?= $done ?>/<?= $total ?> leçons — <?= $pct ?>%</small>
+                                <div class="prog-bar"><div class="prog-fill" style="width:<?= $pct ?>%"></div></div>
                             </div>
-                            <div class="student-progress">
-                                <span><?php echo round($student['avgProgress']); ?>% progress</span>
-                            </div>
+                            <a href="/gestioncours/View/FrontOffice/course/show.php?id=<?= (int)$c['idCourse'] ?>"
+                               style="color:#a78bfa; font-size:.85rem;">Continuer →</a>
                         </div>
                     <?php endforeach; ?>
-                </div>
-            </section>
+                <?php endif; ?>
+            </div>
 
-            <!-- Forum Engagement -->
-            <section class="dashboard-section forum-section">
-                <h2>Recent Forum Activity</h2>
-                <div class="forum-posts-list">
-                    <?php if (empty($dashboardData['modules']['forum']['recentPosts'])): ?>
-                        <p class="empty-state">No forum activity yet</p>
-                    <?php else: ?>
-                        <?php foreach (array_slice($dashboardData['modules']['forum']['recentPosts'], 0, 5) as $post): ?>
-                            <div class="forum-post-item">
-                                <h5><?php echo htmlspecialchars($post['courseTitre']); ?> - <?php echo htmlspecialchars($post['forumTitle']); ?></h5>
-                                <p><?php echo htmlspecialchars($post['nom'] . ' ' . $post['prenom']); ?></p>
-                                <small><?php echo date('M d, Y H:i', strtotime($post['datePost'])); ?></small>
+            <div class="dash-card">
+                <h2><i class="fas fa-certificate"></i> Mes certificats</h2>
+                <?php if (empty($data['certificates'])): ?>
+                    <p style="color:#aaa;">Complétez un cours à 100% pour obtenir votre certificat.</p>
+                <?php else: ?>
+                    <?php foreach ($data['certificates'] as $cert): ?>
+                        <div class="course-row">
+                            <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#10b981,#059669); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="fas fa-certificate" style="color:#fff;"></i>
                             </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </section>
+                            <div class="course-info" style="flex:1;">
+                                <h4><?= htmlspecialchars($cert['courseTitre']) ?></h4>
+                                <small><?= date('d/m/Y', strtotime($cert['date_obtained'])) ?></small>
+                            </div>
+                            <a href="/gestioncours/View/FrontOffice/certificate/view.php?id=<?= (int)$cert['id'] ?>"
+                               style="color:#10b981; font-size:.85rem;">Voir →</a>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                <a href="/gestioncours/View/FrontOffice/certificate/index.php"
+                   style="display:block; margin-top:1rem; color:#eab308; font-size:.85rem;">
+                    Tous mes certificats →
+                </a>
+            </div>
+
+            <div class="dash-card">
+                <h2><i class="fas fa-comments"></i> Activité forum</h2>
+                <?php if (empty($data['recentPosts'])): ?>
+                    <p style="color:#aaa;">Aucune activité forum récente.</p>
+                <?php else: ?>
+                    <?php foreach ($data['recentPosts'] as $p): ?>
+                        <div class="activity-item">
+                            <strong style="color:#a78bfa;"><?= htmlspecialchars($p['forumTitre']) ?></strong>
+                            <br><?= htmlspecialchars(mb_substr($p['contenu'], 0, 80)) ?>…
+                            <br><small style="color:#555;"><?= date('d/m/Y H:i', strtotime($p['datePost'])) ?></small>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
 
-    <?php elseif ($userRole === 'admin'): ?>
-        <!-- ADMIN DASHBOARD -->
-        <div class="dashboard-grid admin-grid">
-            <!-- Platform Overview -->
-            <section class="dashboard-section overview-section">
-                <h2>Platform Overview</h2>
-                <div class="stats-cards large">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['users']['etudiant'] ?? 0; ?></h3>
-                        <p>Students</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['users']['enseignant'] ?? 0; ?></h3>
-                        <p>Teachers</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['courses']['total']; ?></h3>
-                        <p>Courses</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['enrollments']['total']; ?></h3>
-                        <p>Enrollments</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['discussions']; ?></h3>
-                        <p>Forum Topics</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['posts']; ?></h3>
-                        <p>Forum Posts</p>
-                    </div>
-                </div>
-            </section>
+    <?php /* ── TEACHER ─────────────────────────────────────────── */ ?>
+    <?php elseif ($isTeacher): ?>
 
-            <!-- Course Statistics -->
-            <section class="dashboard-section courses-section">
-                <h2>Top Courses by Enrollment</h2>
-                <div class="courses-ranking">
-                    <?php foreach ($dashboardData['modules']['courses']['topCourses'] as $course): ?>
-                        <div class="ranking-item">
-                            <span class="course-title"><?php echo htmlspecialchars($course['titre']); ?></span>
-                            <span class="student-count"><?php echo $course['studentCount']; ?> students</span>
+        <div class="kpi-grid" style="margin-top:1.5rem;">
+            <div class="kpi">
+                <div class="num"><?= count($data['courses']) ?></div>
+                <div class="lbl">Mes cours</div>
+            </div>
+            <div class="kpi">
+                <div class="num"><?= array_sum(array_column($data['courses'], 'activeStudents')) ?></div>
+                <div class="lbl">Étudiants actifs</div>
+            </div>
+            <div class="kpi">
+                <div class="num"><?= count($data['recentPosts'] ?? []) ?></div>
+                <div class="lbl">Posts récents</div>
+            </div>
+        </div>
+
+        <div class="dash-grid">
+            <div class="dash-card">
+                <h2><i class="fas fa-chalkboard-teacher"></i> Mes cours</h2>
+                <?php if (empty($data['courses'])): ?>
+                    <p style="color:#aaa;">Aucun cours assigné.</p>
+                <?php else: ?>
+                    <?php foreach ($data['courses'] as $c): ?>
+                        <div class="course-row">
+                            <div class="course-info" style="flex:1;">
+                                <h4><?= htmlspecialchars($c['titre']) ?></h4>
+                                <small>
+                                    <?= (int)$c['activeStudents'] ?> étudiants actifs •
+                                    <?= (int)$c['avgProgress'] ?>% progression moy. •
+                                    <?= (int)$c['forumCount'] ?> forum(s)
+                                </small>
+                            </div>
+                            <div style="display:flex; gap:.5rem;">
+                                <a href="/gestioncours/View/BackOffice/course/edit.php?id=<?= (int)$c['idCourse'] ?>"
+                                   style="color:#eab308; font-size:.85rem;">Éditer</a>
+                                <a href="/forum?courseId=<?= (int)$c['idCourse'] ?>"
+                                   style="color:#a78bfa; font-size:.85rem;">Forum</a>
+                            </div>
                         </div>
                     <?php endforeach; ?>
-                </div>
-            </section>
+                <?php endif; ?>
+                <a href="/gestioncours/View/BackOffice/course/add.php"
+                   style="display:block; margin-top:1rem; color:#eab308; font-size:.85rem;">
+                    + Ajouter un cours
+                </a>
+            </div>
 
-            <!-- Enrollment Analytics -->
-            <section class="dashboard-section enrollments-section">
-                <h2>Enrollment Analytics</h2>
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['enrollments']['active']; ?></h3>
-                        <p>Active Enrollments</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['enrollments']['certificatesIssued']; ?></h3>
-                        <p>Certificates Issued</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['statistics']['completionRate']; ?>%</h3>
-                        <p>Completion Rate</p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Forum Analytics -->
-            <section class="dashboard-section forum-analytics">
-                <h2>Forum Analytics</h2>
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['ratings']; ?></h3>
-                        <p>Total Ratings</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['forum']['avgRating']; ?>/5</h3>
-                        <p>Average Rating</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3><?php echo $dashboardData['modules']['statistics']['engagementRate']; ?>%</h3>
-                        <p>Engagement Rate</p>
-                    </div>
-                </div>
-
-                <h3>Top Forums</h3>
-                <div class="forums-ranking">
-                    <?php foreach ($dashboardData['modules']['forum']['topForums'] as $forum): ?>
-                        <div class="ranking-item">
-                            <span class="forum-title">
-                                <?php echo htmlspecialchars($forum['courseTitre']); ?> - <?php echo htmlspecialchars($forum['titre']); ?>
-                            </span>
-                            <span class="post-count"><?php echo $forum['postCount']; ?> posts</span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <!-- Recent Activity -->
-            <section class="dashboard-section activity-section">
-                <h2>Recent Platform Activity</h2>
-                <div class="activity-feed">
-                    <?php foreach ($dashboardData['modules']['activity'] as $activity): ?>
+            <div class="dash-card">
+                <h2><i class="fas fa-user-graduate"></i> Inscriptions récentes</h2>
+                <?php if (empty($data['recentEnrollments'])): ?>
+                    <p style="color:#aaa;">Aucune inscription récente.</p>
+                <?php else: ?>
+                    <?php foreach (array_slice($data['recentEnrollments'], 0, 6) as $e): ?>
                         <div class="activity-item">
-                            <span class="activity-type"><?php echo strtoupper($activity['type']); ?></span>
-                            <span class="activity-content">
-                                <?php echo htmlspecialchars($activity['nom'] . ' ' . $activity['prenom']); ?> 
-                                (<?php echo $activity['type'] === 'post' ? 'posted in' : 'enrolled in'; ?>)
-                                <?php echo htmlspecialchars($activity['title']); ?>
-                            </span>
-                            <span class="activity-date"><?php echo date('M d, Y H:i', strtotime($activity['date'])); ?></span>
+                            <strong><?= htmlspecialchars($e['prenom'] . ' ' . $e['nom']) ?></strong>
+                            → <?= htmlspecialchars($e['courseTitre']) ?>
+                            <br><small style="color:#555;"><?= date('d/m/Y', strtotime($e['dateInscription'])) ?></small>
                         </div>
                     <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="dash-card">
+                <h2><i class="fas fa-comments"></i> Forum — activité récente</h2>
+                <?php if (empty($data['recentPosts'])): ?>
+                    <p style="color:#aaa;">Aucune activité forum.</p>
+                <?php else: ?>
+                    <?php foreach ($data['recentPosts'] as $p): ?>
+                        <div class="activity-item">
+                            <strong style="color:#a78bfa;"><?= htmlspecialchars($p['prenom'] . ' ' . $p['nom']) ?></strong>
+                            dans <em><?= htmlspecialchars($p['forumTitre']) ?></em>
+                            <br><?= htmlspecialchars(mb_substr($p['contenu'], 0, 70)) ?>…
+                            <br><small style="color:#555;"><?= date('d/m/Y H:i', strtotime($p['datePost'])) ?></small>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
+    <?php /* ── ADMIN ───────────────────────────────────────────── */ ?>
+    <?php elseif ($isAdmin): ?>
+
+        <div class="kpi-grid" style="margin-top:1.5rem;">
+            <?php
+            $kpis = [
+                ['num' => $data['stats']['totalStudents'],    'lbl' => 'Étudiants'],
+                ['num' => $data['stats']['totalTeachers'],    'lbl' => 'Enseignants'],
+                ['num' => $data['stats']['publishedCourses'], 'lbl' => 'Cours publiés'],
+                ['num' => $data['stats']['activeEnrollments'],'lbl' => 'Inscriptions actives'],
+                ['num' => $data['stats']['certificates'],     'lbl' => 'Certificats'],
+                ['num' => $data['stats']['totalPosts'],       'lbl' => 'Posts forum'],
+            ];
+            foreach ($kpis as $k): ?>
+                <div class="kpi">
+                    <div class="num"><?= $k['num'] ?></div>
+                    <div class="lbl"><?= $k['lbl'] ?></div>
                 </div>
-            </section>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="dash-grid">
+            <div class="dash-card">
+                <h2><i class="fas fa-trophy"></i> Top cours</h2>
+                <?php foreach ($data['topCourses'] as $i => $c): ?>
+                    <div class="course-row">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#eab308; display:flex; align-items:center; justify-content:center; font-weight:800; color:#000; flex-shrink:0;">
+                            <?= $i + 1 ?>
+                        </div>
+                        <div class="course-info" style="flex:1;">
+                            <h4><?= htmlspecialchars($c['titre']) ?></h4>
+                            <small><?= (int)$c['enrolled'] ?> inscriptions</small>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+                <a href="/gestioncours/View/BackOffice/course/list.php"
+                   style="display:block; margin-top:1rem; color:#eab308; font-size:.85rem;">
+                    Gérer tous les cours →
+                </a>
+            </div>
+
+            <div class="dash-card">
+                <h2><i class="fas fa-stream"></i> Activité récente</h2>
+                <?php foreach ($data['recentActivity'] as $a): ?>
+                    <div class="activity-item">
+                        <span class="badge <?= $a['type'] === 'enrollment' ? 'badge-enroll' : 'badge-post' ?>">
+                            <?= $a['type'] === 'enrollment' ? 'Inscription' : 'Post' ?>
+                        </span>
+                        <strong><?= htmlspecialchars($a['prenom'] . ' ' . $a['nom']) ?></strong>
+                        — <?= htmlspecialchars(mb_substr($a['label'], 0, 50)) ?>
+                        <br><small style="color:#555;"><?= date('d/m/Y H:i', strtotime($a['date'])) ?></small>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="dash-card">
+                <h2><i class="fas fa-links"></i> Accès rapides</h2>
+                <div style="display:flex; flex-direction:column; gap:.8rem;">
+                    <a href="/gestioncours/View/BackOffice/course/list.php"    class="btn-outline" style="justify-content:flex-start; gap:.8rem;"><i class="fas fa-graduation-cap"></i> Gérer les cours</a>
+                    <a href="/gestioncours/View/BackOffice/enrollment/list.php" class="btn-outline" style="justify-content:flex-start; gap:.8rem;"><i class="fas fa-user-graduate"></i> Inscriptions</a>
+                    <a href="/gestioncours/View/BackOffice/certificate/list.php" class="btn-outline" style="justify-content:flex-start; gap:.8rem;"><i class="fas fa-certificate"></i> Certificats</a>
+                    <a href="/admin/dashboard"                                  class="btn-outline" style="justify-content:flex-start; gap:.8rem;"><i class="fas fa-users-cog"></i> Utilisateurs</a>
+                    <a href="/forum/manage"                                     class="btn-outline" style="justify-content:flex-start; gap:.8rem;"><i class="fas fa-comments"></i> Forum</a>
+                </div>
+            </div>
         </div>
 
     <?php endif; ?>
-</div>
+</section>
 
-<style>
-.dashboard-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.dashboard-header {
-    margin-bottom: 30px;
-}
-
-.dashboard-header h1 {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
-}
-
-.timestamp {
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.admin-grid {
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-}
-
-.dashboard-section {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.dashboard-section h2 {
-    font-size: 1.5rem;
-    margin-bottom: 15px;
-    border-bottom: 2px solid #007bff;
-    padding-bottom: 10px;
-}
-
-.dashboard-section h3 {
-    font-size: 1.1rem;
-    margin-top: 15px;
-    margin-bottom: 10px;
-}
-
-.stats-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.stats-cards.large {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
-.stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: center;
-}
-
-.stat-card h3 {
-    font-size: 2rem;
-    margin: 0 0 10px 0;
-    color: white;
-}
-
-.stat-card p {
-    margin: 0;
-    font-size: 0.9rem;
-    opacity: 0.9;
-}
-
-.course-item,
-.course-management-item,
-.student-item,
-.forum-post-item,
-.ranking-item,
-.activity-item {
-    padding: 15px;
-    border-left: 4px solid #007bff;
-    margin-bottom: 12px;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-
-.course-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.course-header h4 {
-    margin: 0;
-}
-
-.status-badge {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: bold;
-}
-
-.status-badge.actif {
-    background: #d4edda;
-    color: #155724;
-}
-
-.status-badge.inactif {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.course-progress-bar {
-    height: 8px;
-    background: #ddd;
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 10px 0;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-}
-
-.course-meta {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85rem;
-    color: #666;
-}
-
-.empty-state {
-    text-align: center;
-    color: #999;
-    padding: 30px;
-    font-style: italic;
-}
-
-.course-management-item {
-    border-left: 4px solid #28a745;
-}
-
-.course-stats {
-    display: flex;
-    gap: 15px;
-    margin: 10px 0;
-    font-size: 0.9rem;
-}
-
-.course-stats span {
-    background: white;
-    padding: 5px 10px;
-    border-radius: 4px;
-}
-
-.course-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.btn-small {
-    padding: 6px 12px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    text-decoration: none;
-    font-size: 0.85rem;
-}
-
-.btn-small:hover {
-    background: #0056b3;
-}
-
-.student-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.student-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.student-name {
-    font-weight: bold;
-}
-
-.student-email {
-    font-size: 0.85rem;
-    color: #666;
-}
-
-.forum-post-item h4,
-.forum-post-item h5 {
-    margin: 0 0 5px 0;
-    color: #007bff;
-}
-
-.forum-post-item p {
-    margin: 5px 0;
-    font-size: 0.9rem;
-}
-
-.forum-post-item small {
-    color: #999;
-}
-
-.ranking-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    background: white;
-    border-radius: 4px;
-    margin-bottom: 8px;
-    border-left: 3px solid #ffc107;
-}
-
-.course-title,
-.forum-title {
-    font-weight: 500;
-    flex: 1;
-}
-
-.student-count,
-.post-count {
-    background: #007bff;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.85rem;
-}
-
-.activity-feed {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.activity-item {
-    display: grid;
-    grid-template-columns: 80px 1fr 150px;
-    gap: 10px;
-    align-items: start;
-    padding: 12px;
-    border-left: 3px solid #17a2b8;
-}
-
-.activity-type {
-    background: #17a2b8;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: bold;
-}
-
-.activity-date {
-    text-align: right;
-    color: #999;
-    font-size: 0.85rem;
-}
-</style>
-
-<?php include __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

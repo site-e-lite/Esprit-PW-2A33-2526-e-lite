@@ -17,7 +17,7 @@
     <div class="social-login">
         <p class="social-divider"><span>Ou se connecter avec</span></p>
         <div class="social-buttons">
-            <a href="<?= $basePath ?? '' ?>/login/google" class="social-btn google"><i class="fab fa-google"></i> Google</a>
+            <a href="/gestioncours/google_login.php" class="social-btn google"><i class="fab fa-google"></i> Google</a>
         </div>
     </div>
     <p class="auth-links"><a href="<?= $basePath ?? '' ?>/forgot">Mot de passe oublie ?</a></p>

@@ -279,12 +279,10 @@ function showValidationError(form, message) {
 
 // ══════════════════════════════════════════
 //  Form Validation — Course (Ajouter / Modifier)
+//  NOTE: Validation is handled inline in add.php / edit.php
+//  These helpers are kept for external use only.
 // ══════════════════════════════════════════
 
-/**
- * Valide le titre du cours.
- * Règle : non vide, entre 3 et 100 caractères.
- */
 function isValidTitre(titre) {
     const t = titre.trim();
     if (t.length === 0) return { valid: false, message: 'Le titre est obligatoire.' };
@@ -293,277 +291,47 @@ function isValidTitre(titre) {
     return { valid: true, message: '' };
 }
 
-/**
- * Valide la description du cours.
- * Règle : non vide, au moins 20 caractères.
- */
 function isValidDescription(desc) {
     const d = desc.trim();
-    if (d.length === 0)  return { valid: false, message: 'La description est obligatoire.' };
-    if (d.length < 20)   return { valid: false, message: 'La description doit contenir au moins 20 caractères.' };
+    if (d.length === 0) return { valid: false, message: 'La description est obligatoire.' };
+    if (d.length < 20)  return { valid: false, message: 'La description doit contenir au moins 20 caractères.' };
     return { valid: true, message: '' };
 }
 
-/**
- * Valide la durée du cours.
- * Règle : nombre entier entre 1 et 500.
- */
 function isValidDuree(duree) {
     const val = Number(duree);
-    if (duree === '' || duree === null) return { valid: false, message: 'La durée est obligatoire.' };
-    if (!Number.isInteger(val))         return { valid: false, message: 'La durée doit être un nombre entier.' };
-    if (val < 1)                        return { valid: false, message: 'La durée doit être au moins 1 heure.' };
-    if (val > 500)                      return { valid: false, message: 'La durée ne peut pas dépasser 500 heures.' };
+    if (String(duree).trim() === '') return { valid: false, message: 'La durée est obligatoire.' };
+    if (!Number.isInteger(val))      return { valid: false, message: 'La durée doit être un nombre entier.' };
+    if (val < 1)                     return { valid: false, message: 'La durée doit être au moins 1 heure.' };
+    if (val > 500)                   return { valid: false, message: 'La durée ne peut pas dépasser 500 heures.' };
     return { valid: true, message: '' };
 }
 
-/**
- * Valide le prix du cours.
- * Règle : nombre entre 0 et 9999.99.
- */
 function isValidPrix(prix) {
     const val = parseFloat(prix);
-    if (prix === '' || prix === null) return { valid: false, message: 'Le prix est obligatoire.' };
-    if (isNaN(val))                   return { valid: false, message: 'Le prix doit être un nombre.' };
-    if (val < 0)                      return { valid: false, message: 'Le prix ne peut pas être négatif.' };
-    if (val > 9999.99)                return { valid: false, message: 'Le prix ne peut pas dépasser 9999.99 TND.' };
+    if (String(prix).trim() === '') return { valid: false, message: 'Le prix est obligatoire.' };
+    if (isNaN(val))                 return { valid: false, message: 'Le prix doit être un nombre.' };
+    if (val < 0)                    return { valid: false, message: 'Le prix ne peut pas être négatif.' };
+    if (val > 9999.99)              return { valid: false, message: 'Le prix ne peut pas dépasser 9999.99 TND.' };
     return { valid: true, message: '' };
 }
 
-/**
- * Valide la langue du cours.
- * Règle : non vide, seulement lettres et espaces.
- */
 function isValidLangue(langue) {
     const l = langue.trim();
-    if (l.length === 0)          return { valid: false, message: 'La langue est obligatoire.' };
-    if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(l)) return { valid: false, message: 'La langue ne doit contenir que des lettres.' };
+    if (l.length === 0)                   return { valid: false, message: 'La langue est obligatoire.' };
+    if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(l))    return { valid: false, message: 'La langue ne doit contenir que des lettres.' };
     return { valid: true, message: '' };
 }
 
-/**
- * Valide l'URL de l'image (champ optionnel).
- * Règle : si non vide → doit commencer par http:// ou https://.
- *         Si vide → valide (champ optionnel).
- */
 function isValidImageUrl(url) {
     const u = url.trim();
-    if (u.length === 0) return { valid: true, message: '' }; // optionnel
-    if (!/^https?:\/\/.+/.test(u)) return { valid: false, message: "L'URL doit commencer par http:// ou https://" };
+    if (u.length === 0)                return { valid: true,  message: '' };
+    if (!/^https?:\/\/.+/.test(u))    return { valid: false, message: "L'URL doit commencer par http:// ou https://" };
     return { valid: true, message: '' };
 }
 
-/**
- * Valide le niveau du cours.
- * Règle : doit être 'debutant', 'intermediaire' ou 'avance'.
- */
 function isValidNiveau(niveau) {
     const allowed = ['debutant', 'intermediaire', 'avance'];
     if (!allowed.includes(niveau)) return { valid: false, message: "Le niveau doit être débutant, intermédiaire ou avancé." };
     return { valid: true, message: '' };
 }
-
-// ── Wiring : applique la validation au formulaire cours ──────────
-(function () {
-    const form = document.getElementById('courseForm');
-    if (!form) return;
-
-    // Map champ → fonction de validation
-    const validators = {
-        titre:       v => isValidTitre(v),
-        description: v => isValidDescription(v),
-        duree:       v => isValidDuree(v),
-        prix:        v => isValidPrix(v),
-        langue:      v => isValidLangue(v),
-        image:       v => isValidImageUrl(v),
-        niveau:      v => isValidNiveau(v),
-    };
-
-    function getField(name) {
-        return form.querySelector(`[name="${name}"]`);
-    }
-
-    function applyState(field, result) {
-        if (!field) return;
-        field.style.borderColor = result.valid ? '#22c55e' : '#ef4444';
-        field.style.outline = 'none';
-        // Affiche le message d'erreur dans un <small> adjacent si présent
-        const small = field.parentElement.querySelector('small');
-        if (small) small.textContent = result.valid ? '' : result.message;
-    }
-
-    // Validation live au blur + input
-    Object.keys(validators).forEach(name => {
-        const field = getField(name);
-        if (!field) return;
-        field.addEventListener('blur', () => applyState(field, validators[name](field.value)));
-        field.addEventListener('input', () => {
-            if (field.style.borderColor) applyState(field, validators[name](field.value));
-        });
-    });
-
-    // Validation complète à la soumission
-    form.addEventListener('submit', function (e) {
-        let allValid = true;
-        Object.keys(validators).forEach(name => {
-            const field = getField(name);
-            if (!field) return;
-            const result = validators[name](field.value);
-            applyState(field, result);
-            if (!result.valid) allValid = false;
-        });
-        if (!allValid) {
-            e.preventDefault();
-            showValidationError(form, 'Veuillez corriger les erreurs avant de soumettre.');
-        }
-    });
-})();
-
-// ============================================
-// VALIDATION AJOUTER COURS - PURE JAVASCRIPT
-// ============================================
-
-// 1. Valider le titre
-function validerTitre(titre) {
-    const t = titre.trim();
-    if (t.length === 0)   return { valide: false, message: 'Le titre est obligatoire.' };
-    if (t.length < 3)     return { valide: false, message: 'Le titre doit contenir au moins 3 caractères.' };
-    if (t.length > 100)   return { valide: false, message: 'Le titre ne doit pas dépasser 100 caractères.' };
-    return { valide: true, message: '' };
-}
-
-// 2. Valider la description
-function validerDescription(description) {
-    const d = description.trim();
-    if (d.length === 0)  return { valide: false, message: 'La description est obligatoire.' };
-    if (d.length < 20)   return { valide: false, message: 'La description doit contenir au moins 20 caractères.' };
-    return { valide: true, message: '' };
-}
-
-// 3. Valider la durée
-function validerDuree(duree) {
-    const val = Number(duree);
-    if (String(duree).trim() === '') return { valide: false, message: 'La durée est obligatoire.' };
-    if (!Number.isInteger(val))      return { valide: false, message: 'La durée doit être un nombre entier.' };
-    if (val < 1)                     return { valide: false, message: 'La durée doit être au moins 1 heure.' };
-    if (val > 500)                   return { valide: false, message: 'La durée ne peut pas dépasser 500 heures.' };
-    return { valide: true, message: '' };
-}
-
-// 4. Valider le prix
-function validerPrix(prix) {
-    const val = parseFloat(prix);
-    if (String(prix).trim() === '') return { valide: false, message: 'Le prix est obligatoire.' };
-    if (isNaN(val))                 return { valide: false, message: 'Le prix doit être un nombre.' };
-    if (val < 0)                    return { valide: false, message: 'Le prix ne peut pas être négatif.' };
-    if (val > 9999.99)              return { valide: false, message: 'Le prix ne peut pas dépasser 9999.99 TND.' };
-    return { valide: true, message: '' };
-}
-
-// 5. Valider la langue
-function validerLangue(langue) {
-    const l = langue.trim();
-    if (l.length === 0)                  return { valide: false, message: 'La langue est obligatoire.' };
-    if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(l))   return { valide: false, message: 'La langue ne doit contenir que des lettres.' };
-    return { valide: true, message: '' };
-}
-
-// 6. Valider le niveau
-function validerNiveau(niveau) {
-    const allowed = ['debutant', 'intermediaire', 'avance'];
-    if (!allowed.includes(niveau)) return { valide: false, message: "Le niveau doit être : débutant, intermédiaire ou avancé." };
-    return { valide: true, message: '' };
-}
-
-// 7. Valider l'URL de l'image (optionnel)
-function validerImageUrl(url) {
-    const u = url.trim();
-    if (u.length === 0)                    return { valide: true,  message: '' }; // champ optionnel
-    if (!/^https?:\/\/.+/.test(u))         return { valide: false, message: "L'URL doit commencer par http:// ou https://" };
-    return { valide: true, message: '' };
-}
-
-// 8. Fonction principale — valide tout le formulaire d'un coup
-function validerFormulaireComplet(cours) {
-    // cours = { titre, description, duree, prix, langue, niveau, imageUrl }
-    const erreurs = {};
-
-    const checks = {
-        titre:       validerTitre(cours.titre       ?? ''),
-        description: validerDescription(cours.description ?? ''),
-        duree:       validerDuree(cours.duree        ?? ''),
-        prix:        validerPrix(cours.prix          ?? ''),
-        langue:      validerLangue(cours.langue      ?? ''),
-        niveau:      validerNiveau(cours.niveau      ?? ''),
-        imageUrl:    validerImageUrl(cours.imageUrl  ?? ''),
-    };
-
-    Object.entries(checks).forEach(([champ, result]) => {
-        if (!result.valide) erreurs[champ] = result.message;
-    });
-
-    return {
-        valide:  Object.keys(erreurs).length === 0,
-        erreurs: erreurs,
-    };
-}
-
-// 9. Validation en temps réel — branche les écouteurs sur le formulaire
-function activerValidationTempsReel() {
-    const form = document.getElementById('courseForm');
-    if (!form) return;
-
-    // Map : name du champ → fonction de validation
-    const validators = {
-        titre:       v => validerTitre(v),
-        description: v => validerDescription(v),
-        duree:       v => validerDuree(v),
-        prix:        v => validerPrix(v),
-        langue:      v => validerLangue(v),
-        niveau:      v => validerNiveau(v),
-        image:       v => validerImageUrl(v),
-    };
-
-    // Affiche ou efface le message d'erreur sous le champ
-    function afficherEtat(field, result) {
-        if (!field) return;
-        field.style.borderColor = result.valide ? '#22c55e' : '#ef4444';
-        const small = field.closest('br')
-            ? field.parentElement.querySelector('small')
-            : field.nextElementSibling;
-        if (small && small.tagName === 'SMALL') {
-            small.textContent = result.valide ? '' : result.message;
-            small.style.color = '#ef4444';
-        }
-    }
-
-    // Branche 'input' + 'blur' sur chaque champ
-    Object.entries(validators).forEach(([name, fn]) => {
-        const field = form.querySelector(`[name="${name}"]`);
-        if (!field) return;
-
-        field.addEventListener('input', () => afficherEtat(field, fn(field.value)));
-        field.addEventListener('blur',  () => afficherEtat(field, fn(field.value)));
-    });
-
-    // Validation complète à la soumission
-    form.addEventListener('submit', function (e) {
-        let allValid = true;
-
-        Object.entries(validators).forEach(([name, fn]) => {
-            const field = form.querySelector(`[name="${name}"]`);
-            if (!field) return;
-            const result = fn(field.value);
-            afficherEtat(field, result);
-            if (!result.valide) allValid = false;
-        });
-
-        if (!allValid) {
-            e.preventDefault();
-            showValidationError(form, 'Veuillez corriger les erreurs avant de soumettre le formulaire.');
-        }
-    });
-}
-
-// Auto-activation dès que le DOM est prêt
-document.addEventListener('DOMContentLoaded', activerValidationTempsReel);

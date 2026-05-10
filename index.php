@@ -1,22 +1,22 @@
 <?php
-<<<<<<< HEAD
-header('Location: /gestioncours/View/FrontOffice/course/index.php');
-exit;
-=======
 /**
- * Point d'entrée : authentification (main) + route /forum vers le front forum.
- * Sous-dossier XAMPP : les chemins de requête sont normalisés avec le dossier du script.
+ * index.php — Main entry point for the unified e-lite application.
+ * Handles routing for: auth, forum, admin, profile.
+ * Direct PHP file URLs (View/...) still work independently.
  */
 session_start();
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/Controller/User/UserController.php';
 require_once __DIR__ . '/Controller/Forum/ForumController.php';
 
+// Resolve base path (works in subdirectory like /gestioncours/)
 $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-$basePath     = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+$basePath   = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
 if ($basePath === '.' || $basePath === '/') {
     $basePath = '';
 }
 
+// Normalize request path
 $request = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
 if ($basePath !== '' && strpos($request, $basePath) === 0) {
     $request = substr($request, strlen($basePath)) ?: '/';
@@ -28,72 +28,88 @@ $controller = new UserController();
 switch ($request) {
     case '':
     case '/':
-        include __DIR__ . '/View/layout/header.php';
-        $bp = $basePath === '' ? '' : $basePath;
-        echo '<div class="hero"><h1>Welcome to e-lite</h1><p>'
-            . '<a href="' . htmlspecialchars($bp . '/login') . '" class="btn-primary">Login</a> '
-            . '<a href="' . htmlspecialchars($bp . '/register') . '" class="btn-outline">Register</a></p>';
-        echo '<p style="margin-top:1rem;"><a href="' . htmlspecialchars($bp . '/forum') . '">Accéder au forum</a></p></div>';
-        include __DIR__ . '/View/layout/footer.php';
-        break;
+        header('Location: ' . $basePath . '/View/FrontOffice/course/index.php');
+        exit;
+
     case '/forum':
         require __DIR__ . '/View/Forum/FrontOffice/index.php';
         break;
+
     case '/forum/manage':
         if (!isset($_SESSION['user_id'])) {
-            header('Location: ' . ($basePath === '' ? '' : $basePath) . '/login');
+            header('Location: ' . $basePath . '/login');
             exit;
         }
         require __DIR__ . '/View/Forum/BackOffice/forum.php';
         break;
+
     case '/login':
         $controller->login();
         break;
+
     case '/logout':
         $controller->logout();
         break;
+
     case '/register':
         $controller->register();
         break;
+
     case '/profile':
         $controller->profile();
         break;
+
     case '/profile/delete':
         $controller->deleteAccount();
         break;
+
     case '/profile/remove-photo':
         $controller->removePhoto();
         break;
-    case '/profile/regenerate-code':
-        http_response_code(404);
-        echo "404 - Page not found: " . htmlspecialchars($request);
-        break;
+
     case '/admin/dashboard':
         $controller->adminDashboard();
         break;
+
     case '/student/dashboard':
         $controller->studentDashboard();
         break;
+
     case '/login/google':
+        if (empty(GOOGLE_CLIENT_ID)) {
+            // Google OAuth not configured — redirect back to login
+            $_SESSION['flash_error'] = 'La connexion Google n\'est pas configurée.';
+            header('Location: ' . $basePath . '/login');
+            exit;
+        }
         $controller->googleLogin();
         break;
+
     case '/login/google-callback':
+        if (empty(GOOGLE_CLIENT_ID)) {
+            header('Location: ' . $basePath . '/login');
+            exit;
+        }
         $controller->googleCallback();
         break;
+
     case '/forgot':
         $controller->forgotPassword();
         break;
-    case '/verify-code':
-        $controller->verifyCode();
-        break;
+
     case '/reset-password':
         $controller->resetPassword();
         break;
+
     case '/reset-success':
         $controller->resetSuccess();
         break;
+
     default:
         http_response_code(404);
-        echo "404 - Page not found: " . htmlspecialchars($request);
+        include __DIR__ . '/View/layout/header.php';
+        echo '<section style="text-align:center; padding:4rem;"><h2>404 — Page introuvable</h2>
+              <p style="color:#aaa;">' . htmlspecialchars($request) . '</p>
+              <a href="' . htmlspecialchars($basePath . '/View/FrontOffice/course/index.php') . '" class="btn-primary" style="margin-top:1rem;">Retour à l\'accueil</a></section>';
+        include __DIR__ . '/View/layout/footer.php';
 }
->>>>>>> 947d1560670f98dea9fd32a6da1b7f0f76c3eb81
