@@ -1,0 +1,278 @@
+{
+    "packages": [
+        {
+            "name": "abraham/twitteroauth",
+            "version": "8.1.1",
+            "version_normalized": "8.1.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/abraham/twitteroauth.git",
+                "reference": "95da0d496c4931a7b7e1c816280df953c285648d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/abraham/twitteroauth/zipball/95da0d496c4931a7b7e1c816280df953c285648d",
+                "reference": "95da0d496c4931a7b7e1c816280df953c285648d",
+                "shasum": ""
+            },
+            "require": {
+                "composer/ca-bundle": "^1",
+                "ext-curl": "*",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9",
+                "rector/rector": "^0.15.7 || ^2.0.0",
+                "squizlabs/php_codesniffer": "^3 || ^4"
+            },
+            "time": "2026-01-18T23:30:08+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "Abraham\\TwitterOAuth\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Abraham Williams",
+                    "email": "abraham@abrah.am",
+                    "homepage": "https://abrah.am",
+                    "role": "Developer"
+                }
+            ],
+            "description": "The most popular PHP library for use with the Twitter OAuth REST API.",
+            "homepage": "https://twitteroauth.com",
+            "keywords": [
+                "Twitter API",
+                "Twitter oAuth",
+                "api",
+                "oauth",
+                "rest",
+                "social",
+                "twitter"
+            ],
+            "support": {
+                "issues": "https://github.com/abraham/twitteroauth/issues",
+                "source": "https://github.com/abraham/twitteroauth"
+            },
+            "install-path": "../abraham/twitteroauth"
+        },
+        {
+            "name": "composer/ca-bundle",
+            "version": "1.5.11",
+            "version_normalized": "1.5.11.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/composer/ca-bundle.git",
+                "reference": "68ff39175e8e94a4bb1d259407ce51a6a60f09e6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/68ff39175e8e94a4bb1d259407ce51a6a60f09e6",
+                "reference": "68ff39175e8e94a4bb1d259407ce51a6a60f09e6",
+                "shasum": ""
+            },
+            "require": {
+                "ext-openssl": "*",
+                "ext-pcre": "*",
+                "php": "^7.2 || ^8.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^8 || ^9",
+                "psr/log": "^1.0 || ^2.0 || ^3.0",
+                "symfony/process": "^4.0 || ^5.0 || ^6.0 || ^7.0"
+            },
+            "time": "2026-03-30T09:16:10+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "1.x-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "Composer\\CaBundle\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jordi Boggiano",
+                    "email": "j.boggiano@seld.be",
+                    "homepage": "http://seld.be"
+                }
+            ],
+            "description": "Lets you find a path to the system CA bundle, and includes a fallback to the Mozilla CA bundle.",
+            "keywords": [
+                "cabundle",
+                "cacert",
+                "certificate",
+                "ssl",
+                "tls"
+            ],
+            "support": {
+                "irc": "irc://irc.freenode.org/composer",
+                "issues": "https://github.com/composer/ca-bundle/issues",
+                "source": "https://github.com/composer/ca-bundle/tree/1.5.11"
+            },
+            "funding": [
+                {
+                    "url": "https://packagist.com",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/composer",
+                    "type": "github"
+                }
+            ],
+            "install-path": "./ca-bundle"
+        },
+        {
+            "name": "google/apiclient",
+            "version": "v1.1.9",
+            "version_normalized": "1.1.9.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/googleapis/google-api-php-client.git",
+                "reference": "19d7d735ee4cff0f8c14a234b5094b99d00ef278"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/googleapis/google-api-php-client/zipball/19d7d735ee4cff0f8c14a234b5094b99d00ef278",
+                "reference": "19d7d735ee4cff0f8c14a234b5094b99d00ef278",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.2.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "3.7.*",
+                "squizlabs/php_codesniffer": "~2.3"
+            },
+            "time": "2020-07-22T19:51:49+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-v1-master": "1.1.x-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "files": [
+                    "src/Google/autoload.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Client library for Google APIs",
+            "homepage": "http://developers.google.com/api-client-library/php",
+            "keywords": [
+                "google"
+            ],
+            "support": {
+                "issues": "https://github.com/googleapis/google-api-php-client/issues",
+                "source": "https://github.com/googleapis/google-api-php-client/tree/v1.1.9"
+            },
+            "install-path": "../google/apiclient"
+        },
+        {
+            "name": "phpmailer/phpmailer",
+            "version": "v7.0.2",
+            "version_normalized": "7.0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/PHPMailer/PHPMailer.git",
+                "reference": "ebf1655bd5b99b3f97e1a3ec0a69e5f4cd7ea088"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/PHPMailer/PHPMailer/zipball/ebf1655bd5b99b3f97e1a3ec0a69e5f4cd7ea088",
+                "reference": "ebf1655bd5b99b3f97e1a3ec0a69e5f4cd7ea088",
+                "shasum": ""
+            },
+            "require": {
+                "ext-ctype": "*",
+                "ext-filter": "*",
+                "ext-hash": "*",
+                "php": ">=5.5.0"
+            },
+            "require-dev": {
+                "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+                "doctrine/annotations": "^1.2.6 || ^1.13.3",
+                "php-parallel-lint/php-console-highlighter": "^1.0.0",
+                "php-parallel-lint/php-parallel-lint": "^1.3.2",
+                "phpcompatibility/php-compatibility": "^10.0.0@dev",
+                "squizlabs/php_codesniffer": "^3.13.5",
+                "yoast/phpunit-polyfills": "^1.0.4"
+            },
+            "suggest": {
+                "decomplexity/SendOauth2": "Adapter for using XOAUTH2 authentication",
+                "directorytree/imapengine": "For uploading sent messages via IMAP, see gmail example",
+                "ext-imap": "Needed to support advanced email address parsing according to RFC822",
+                "ext-mbstring": "Needed to send email in multibyte encoding charset or decode encoded addresses",
+                "ext-openssl": "Needed for secure SMTP sending and DKIM signing",
+                "greew/oauth2-azure-provider": "Needed for Microsoft Azure XOAUTH2 authentication",
+                "hayageek/oauth2-yahoo": "Needed for Yahoo XOAUTH2 authentication",
+                "league/oauth2-google": "Needed for Google XOAUTH2 authentication",
+                "psr/log": "For optional PSR-3 debug logging",
+                "symfony/polyfill-mbstring": "To support UTF-8 if the Mbstring PHP extension is not enabled (^1.2)",
+                "thenetworg/oauth2-azure": "Needed for Microsoft XOAUTH2 authentication"
+            },
+            "time": "2026-01-09T18:02:33+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "PHPMailer\\PHPMailer\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-2.1-only"
+            ],
+            "authors": [
+                {
+                    "name": "Marcus Bointon",
+                    "email": "phpmailer@synchromedia.co.uk"
+                },
+                {
+                    "name": "Jim Jagielski",
+                    "email": "jimjag@gmail.com"
+                },
+                {
+                    "name": "Andy Prevost",
+                    "email": "codeworxtech@users.sourceforge.net"
+                },
+                {
+                    "name": "Brent R. Matzelle"
+                }
+            ],
+            "description": "PHPMailer is a full-featured email creation and transfer class for PHP",
+            "support": {
+                "issues": "https://github.com/PHPMailer/PHPMailer/issues",
+                "source": "https://github.com/PHPMailer/PHPMailer/tree/v7.0.2"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/Synchro",
+                    "type": "github"
+                }
+            ],
+            "install-path": "../phpmailer/phpmailer"
+        }
+    ],
+    "dev": true,
+    "dev-package-names": []
+}

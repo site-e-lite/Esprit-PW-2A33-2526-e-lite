@@ -1,0 +1,42 @@
+<?php
+/** @var array $users */
+/** @var array $roles */
+/** @var int $currentRoleId */
+?>
+<div class="admin-dashboard glass-card">
+    <h1>Administration des utilisateurs</h1>
+    <p style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+        <a href="<?= $basePath ?? '' ?>/profile" class="btn-outline">Modifier mon profil</a>
+        <a href="<?= $basePath ?? '' ?>/forum/manage" class="btn-outline">Gestion Forum</a>
+        <a href="<?= $basePath ?? '' ?>/logout" class="btn-danger">Déconnexion</a>
+    </p>
+    <table class="user-table">
+        <thead><tr><th>ID</th><th>Nom</th><th>Email</th><th>Rôle</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody>
+        <?php foreach ($users as $u): ?>
+        <tr>
+            <td><?= $u['idUser'] ?></td>
+            <td><?= htmlspecialchars($u['nom']).' '.htmlspecialchars($u['prenom']) ?></td>
+            <td><?= htmlspecialchars($u['email']) ?></td>
+            <td><?= htmlspecialchars($u['role']) ?></td>
+            <td><span class="status-badge <?= $u['statut'] === 'actif' ? 'status-active' : 'status-inactive' ?>"><?= $u['statut'] === 'actif' ? 'Actif' : 'Banni' ?></span></td>
+            <td class="actions">
+                <?php if ($u['idUser'] != $_SESSION['user_id']): ?>
+                    <form method="POST" style="display:inline-block"><input type="hidden" name="user_id" value="<?= $u['idUser'] ?>"><button type="submit" name="ban_user" class="btn-outline">Bannir</button></form>
+                    <form method="POST" style="display:inline-block"><input type="hidden" name="user_id" value="<?= $u['idUser'] ?>"><button type="submit" name="delete_user" class="btn-danger" onclick="return confirm('Supprimer définitivement ?')">Supprimer</button></form>
+                    <?php if ($currentRole === 'admin'): ?>
+                        <form method="POST" style="display:inline-block">
+                            <input type="hidden" name="user_id" value="<?= $u['idUser'] ?>">
+                            <select name="new_role"><?php foreach ($roles as $r): ?><option value="<?= $r['idRole'] ?>" <?= $r['idRole'] === $u['role'] ? 'selected' : '' ?>><?= htmlspecialchars($r['nom']) ?></option><?php endforeach; ?></select>
+                            <button type="submit" name="change_role" class="btn-primary">Changer rôle</button>
+                        </form>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <span class="self-badge">(vous)</span>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>

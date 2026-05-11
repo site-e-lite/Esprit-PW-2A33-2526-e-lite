@@ -1,0 +1,5 @@
+RewriteEngine On
+RewriteBase /7ashwa/Esprit-PW-2A33-2526-e-lite-Gestion_Forum/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
