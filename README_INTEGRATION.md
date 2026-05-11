@@ -69,11 +69,11 @@ The platform allows:
 
 | Member | Contribution |
 |--------|--------------|
-| Name 1 | Evaluation Management |
-| Name 2 | Course Management |
-| Name 3 | Forum Management |
-| Name 4 | User Management |
-| Name 5 | Virtual Classes |
+| yassin 1 | Evaluation Management |
+| youssef 2 | Course Management |
+| bilel 3 | Forum Management |
+| aziz 4 | User Management |
+| mohamed 5 | Virtual Classes |
 
 ---
 
